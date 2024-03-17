@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+H:/ESP32/engine/1/gatt_server/build/CMakeFiles/bootloader
+H:/ESP32/engine/1/gatt_server/build/CMakeFiles/bootloader.rule
+H:/ESP32/engine/1/gatt_server/build/CMakeFiles/bootloader-complete.rule
+H:/ESP32/engine/1/gatt_server/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+H:/ESP32/engine/1/gatt_server/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+H:/ESP32/engine/1/gatt_server/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+H:/ESP32/engine/1/gatt_server/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+H:/ESP32/engine/1/gatt_server/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+H:/ESP32/engine/1/gatt_server/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+H:/ESP32/engine/1/gatt_server/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule
