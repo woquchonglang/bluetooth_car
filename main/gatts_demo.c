@@ -769,8 +769,7 @@ void app_main(void)
 
     motor_init();
     
-    // bdc_motor_set_speed(motor1, 400);
-    // bdc_motor_set_speed(motor2, 400);
+
 
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
     ret = esp_bt_controller_init(&bt_cfg);
