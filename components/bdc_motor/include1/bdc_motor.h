@@ -12,11 +12,22 @@
 extern "C" {
 #endif
 
+#ifndef __BCD_MOTOR_H__
+#define __BCD_MOTOR_H__
+
 #define BDC_MCPWM_TIMER_RESOLUTION_HZ 10000000 // 10MHz, 1 tick = 0.1us
 #define BDC_MCPWM_FREQ_HZ             25000    // 25KHz PWM
 #define BDC_MCPWM_DUTY_TICK_MAX       (BDC_MCPWM_TIMER_RESOLUTION_HZ / BDC_MCPWM_FREQ_HZ) // maximum value we can set for the duty cycle, in ticks
 
-#define BDC_MCPWM_GPIO_L1_A              4
+/**
+ *        tou
+ *     R1      R2
+ *     L1      L2
+ *
+*/
+
+
+#define BDC_MCPWM_GPIO_L1_A              4      
 #define BDC_MCPWM_GPIO_L1_B              5
 #define BDC_MCPWM_GPIO_R1_A              6
 #define BDC_MCPWM_GPIO_R1_B              7
@@ -182,6 +193,7 @@ void motor_R_return2();
 void motor_L_return1();
 void motor_L_return2();
 
+#endif
 
 #ifdef __cplusplus
 }

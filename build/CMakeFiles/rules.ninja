@@ -1418,10 +1418,29 @@ rule C_STATIC_LIBRARY_LINKER____idf_bdc_motor_
 
 
 #############################################
+# Rule for compiling C files.
+
+rule C_COMPILER____idf_detect_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ccache D:\software\esp32_5.0\Espressif\tools\xtensa-esp32s3-elf\esp-2022r1-11.2.0\xtensa-esp32s3-elf\bin\xtensa-esp32s3-elf-gcc.exe $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
+  description = Building C object $out
+
+
+#############################################
+# Rule for linking C static library.
+
+rule C_STATIC_LIBRARY_LINKER____idf_detect_
+  command = cmd.exe /C "$PRE_LINK && D:\software\esp32_5.0\Espressif\tools\cmake\3.24.0\bin\cmake.exe -E rm -f $TARGET_FILE && D:\software\esp32_5.0\Espressif\tools\xtensa-esp32s3-elf\esp-2022r1-11.2.0\xtensa-esp32s3-elf\bin\xtensa-esp32s3-elf-ar.exe qc $TARGET_FILE $LINK_FLAGS $in && D:\software\esp32_5.0\Espressif\tools\xtensa-esp32s3-elf\esp-2022r1-11.2.0\xtensa-esp32s3-elf\bin\xtensa-esp32s3-elf-ranlib.exe $TARGET_FILE && $POST_BUILD"
+  description = Linking C static library $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
 # Rule for re-running cmake.
 
 rule RERUN_CMAKE
-  command = D:\software\esp32_5.0\Espressif\tools\cmake\3.24.0\bin\cmake.exe --regenerate-during-build -SH:\ESP32\engine\1\gatt_server -BH:\ESP32\engine\1\gatt_server\build
+  command = D:\software\esp32_5.0\Espressif\tools\cmake\3.24.0\bin\cmake.exe --regenerate-during-build -SH:\engine\scnu_robot\gatt_server -BH:\engine\scnu_robot\gatt_server\build
   description = Re-running CMake...
   generator = 1
 
