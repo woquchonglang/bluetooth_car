@@ -32,6 +32,7 @@
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
 #include "bdc_motor.h"
+#include "detect.h"
 //#include "BLE.h"
 
 #include "sdkconfig.h"
@@ -362,82 +363,95 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
             esp_log_buffer_char(GATTS_TAG, param->write.value, param->write.len);
              ESP_LOGI(GATTS_TAG,"value:%d", *param->write.value);
 
-            if(param->write.value[1] == 0x01)
-            {
-               
-            }
-            if(param->write.value[1] == 0xff)
-            {
-                bdc_motor_set_speed(motor1,0);
-                bdc_motor_set_speed(motor2, 0);
-                bdc_motor_set_speed(motor3, 0);
-                bdc_motor_set_speed(motor4, 0);
-            }
-            if(param->write.value[1] == 0)
-            {
-                if(param->write.value[2] == 0x00 && param->write.value[4] == 0x00){
-                     motor_stop();
-                }
-                if(param->write.value[2] == 0x00 && param->write.value[4] == 0x01){
-                     motor_forward1();
-                }
-                if(param->write.value[2] == 0x00 && param->write.value[4] == 0x02){
-                     motor_forward2();
-                }
-                if(param->write.value[2] == 0x00 && param->write.value[4] == 0xff){
-                     motor_retreat1();
-                }
-                if(param->write.value[2] == 0x00 && param->write.value[4] == 0xfe){
-                     motor_retreat2();
-                }
-                if(param->write.value[2] == 0x01 && param->write.value[4] == 0x01){
-                     motor_R_1();
-                }
-                if(param->write.value[2] == 0x02 && param->write.value[4] == 0x02){
-                     motor_R_2();
-                }
-                if(param->write.value[2] == 0xff && param->write.value[4] == 0xff){
-                     motor_L_1();
-                }
-                if(param->write.value[2] == 0xfe && param->write.value[4] == 0xfe){
-                     motor_L_2();
-                }
-                
-                
-                // if(param->write.value[2] == 0x01 && param->write.value[4] == 0x02){
-                //      motor_R_forward2();
-                // }
-                // if(param->write.value[2] == 0x01 && param->write.value[4] == 0x02){
-                //      motor_R_forward2();
-                // }
-                // if(param->write.value[2] == 0x01 && param->write.value[4] == 0x02){
-                //      motor_R_forward2();
-                // }
-                // if(param->write.value[2] == 0x01 && param->write.value[4] == 0x02){
-                //      motor_R_forward2();
-                // }
-                // if(param->write.value[2] == 0x01 && param->write.value[4] == 0x02){
-                //      motor_R_forward2();
-                // }
-                
-                
 
+           if(param->write.value[3] == 0x00 && param->write.value[4] == 0x00){
+                     motor_stop();
             }
             else{
-                if( param->write.value[4] == 0x01){
-                     motor_R_return1();
-                }
-                if( param->write.value[4] == 0x02){
-                     motor_R_return2();
-                }
-                if(param->write.value[4] == 0xff){
-                     motor_L_return1();
-                }
-                if(param->write.value[4] == 0xfe){
-                     motor_L_return2();
+                if(param->write.value[4] != 0){
+                    if(param->write.value[1] == 0){
+                        if(param->write.value[2] != 0){
+                            if(param->write.value[2] == 0xff && param->write.value[3] == 0xff){
+                                motor_L_retreat1();
+                            }
+                            if(param->write.value[2] == 0xfe && param->write.value[3] == 0xfe){
+                                motor_L_retreat2();
+                            }
+                            if(param->write.value[2] == 0x01 && param->write.value[3] == 0x01){
+                                motor_R_forward1();
+                            }
+                            if(param->write.value[2] == 0x02 && param->write.value[3] == 0xfe){
+                                motor_R_forward2();
+                            }
+                        }
+                        if(param->write.value[3] == 0x01 && param->write.value[4] == 0x01){
+                            motor_forward1();
+                        }
+                        if(param->write.value[3] == 0x02 && param->write.value[4] == 0x02){
+                            motor_forward2();
+                        }
+                        if(param->write.value[3] == 0xff && param->write.value[4] == 0xff){
+                            motor_retreat1();
+                        }
+                        if(param->write.value[3] == 0xfe && param->write.value[4] == 0xfe){
+                            motor_retreat2();
+                        }
+                        if(param->write.value[2] == 0x01 && param->write.value[4] == 0x01){
+                            motor_R_1();
+                        }
+                        if(param->write.value[2] == 0x02 && param->write.value[4] == 0x02){
+                            motor_R_2();
+                        }
+                        if(param->write.value[2] == 0xff && param->write.value[4] == 0xff){
+                            motor_L_1();
+                        }
+                        if(param->write.value[2] == 0xfe && param->write.value[4] == 0xfe){
+                            motor_L_2();
+                        }
+                    }
+                  
+                    else{               
+                        if( param->write.value[4] == 0x01){
+                            motor_R_return1();
+                        }
+                        if( param->write.value[4] == 0x02){
+                            motor_R_return2();
+                        }
+                        if(param->write.value[4] == 0xff){
+                            motor_L_return1();
+                        }
+                        if(param->write.value[4] == 0xfe){
+                            motor_L_return2();
+                        }
+
+                    }
+                }   
+
+                else
+                {
+                    if(param->write.value[2] == 0xff && param->write.value[3] == 0x01){
+                        motor_L_forward1();
+                    }
+                    if(param->write.value[2] == 0xfe && param->write.value[3] == 0x02){
+                        motor_L_forward2();
+                    }
+                    
+                    if(param->write.value[2] == 0xff && param->write.value[3] == 0xff){
+                        motor_L_retreat1();
+                    }
+                    if(param->write.value[2] == 0xfe && param->write.value[3] == 0xfe){
+                        motor_L_retreat2();
+                    }
+                    if(param->write.value[2] == 0x01 && param->write.value[3] == 0xff){
+                        motor_R_retreat1();
+                    }
+                    if(param->write.value[2] == 0x02 && param->write.value[3] == 0xfe){
+                        motor_R_retreat2();
+                    }
                 }
 
             }
+           
 
             // if (gl_profile_tab[PROFILE_A_APP_ID].descr_handle == param->write.handle && param->write.len == 2){
             //     uint16_t descr_value = param->write.value[1]<<8 | param->write.value[0];
@@ -768,8 +782,6 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
 
     motor_init();
-    
-
 
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
     ret = esp_bt_controller_init(&bt_cfg);

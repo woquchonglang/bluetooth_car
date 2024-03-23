@@ -1,4 +1,4 @@
-# Install script for directory: H:/ESP32/engine/1/gatt_server/components/BLE
+# Install script for directory: H:/engine/scnu_robot/gatt_server/components/BLE
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

@@ -1,7 +1,7 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
   "idf.adapterTargetName": "esp32s3",
-  "idf.portWin": "COM15",
+  "idf.portWin": "COM12",
   "idf.flashType": "UART",
   "files.associations": {
     "esp_gatt_common_api.h": "c",
@@ -15,6 +15,8 @@
     "utility": "c",
     "*.tcc": "c",
     "regex": "c",
-    "bdc_motor_interface.h": "c"
+    "bdc_motor_interface.h": "c",
+    "bdc_motor.h": "c",
+    "detect.h": "c"
   }
 }

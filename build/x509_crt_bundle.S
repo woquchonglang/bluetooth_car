@@ -1,4 +1,4 @@
-/* * Data converted from H:/ESP32/engine/1/gatt_server/build/esp-idf/mbedtls/x509_crt_bundle
+/* * Data converted from H:/engine/scnu_robot/gatt_server/build/esp-idf/mbedtls/x509_crt_bundle
  */
 .data
 .section .rodata.embedded
