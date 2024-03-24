@@ -1,7 +1,7 @@
 {
     "version":            "1",
     "project_name":       "gatt_server_demos",
-    "project_version":    "d286817-dirty",
+    "project_version":    "74aae02-dirty",
     "project_path":       "H:/engine/scnu_robot/gatt_server",
     "idf_path":           "D:/software/esp32_5.0/Espressif/frameworks/esp-idf-v5.0.4",
     "build_dir":          "H:/engine/scnu_robot/gatt_server/build",

@@ -17,6 +17,8 @@
     "regex": "c",
     "bdc_motor_interface.h": "c",
     "bdc_motor.h": "c",
-    "detect.h": "c"
+    "detect.h": "c",
+    "chrono": "c",
+    "bitset": "c"
   }
 }
