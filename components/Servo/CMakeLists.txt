@@ -1,5 +1,5 @@
 idf_component_register(	
-	SRCS 		   "detect.c"	
+	SRCS 		   "Servo.c"	
 	INCLUDE_DIRS   "include"
-	REQUIRES	   bdc_motor
+	REQUIRES	   "driver"
 )

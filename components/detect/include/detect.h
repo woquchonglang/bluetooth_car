@@ -3,6 +3,8 @@
 
 #include "bdc_motor.h"
 
+void detect_gpio_init();
+
 void Detect_mode();
 
 #endif

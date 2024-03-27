@@ -11,9 +11,19 @@
 
 #define Condition (l1<<4) + (l2<<3) + (r2<<2) + (r1)
 
+void detect_gpio_init()
+{
+	gpio_set_direction(GPIO_NUM_11,  GPIO_MODE_DEF_INPUT);
+    gpio_set_direction(GPIO_NUM_12,  GPIO_MODE_DEF_INPUT);
+    gpio_set_direction(GPIO_NUM_13,  GPIO_MODE_DEF_INPUT);
+    gpio_set_direction(GPIO_NUM_14,  GPIO_MODE_DEF_INPUT);
+}
+
 void Detect_mode(){
 
-			if(Condition==17 ||Condition==6){
+	while(1)
+	{
+		if(Condition==17 ||Condition==6){
 					motor_forward1();
 			}
 			else if(Condition==14 || Condition==16 || Condition==12){
@@ -27,6 +37,9 @@ void Detect_mode(){
 			}
 			else if(Condition==1)
 					motor_R_return2();
+	}
+
+			
 
 }
 
