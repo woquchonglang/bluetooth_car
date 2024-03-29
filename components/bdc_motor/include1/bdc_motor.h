@@ -29,10 +29,10 @@ extern "C" {
 
 #define BDC_MCPWM_GPIO_L1_A              4      
 #define BDC_MCPWM_GPIO_L1_B              5
-#define BDC_MCPWM_GPIO_R1_A              6
-#define BDC_MCPWM_GPIO_R1_B              7
-#define BDC_MCPWM_GPIO_L2_A              15
-#define BDC_MCPWM_GPIO_L2_B              16
+#define BDC_MCPWM_GPIO_L2_A              6
+#define BDC_MCPWM_GPIO_L2_B              7
+#define BDC_MCPWM_GPIO_R1_A              15
+#define BDC_MCPWM_GPIO_R1_B              16
 #define BDC_MCPWM_GPIO_R2_A              17
 #define BDC_MCPWM_GPIO_R2_B              18
 
@@ -192,6 +192,7 @@ void motor_R_return1();
 void motor_R_return2();
 void motor_L_return1();
 void motor_L_return2();
+void motor_test1();
 
 #endif
 

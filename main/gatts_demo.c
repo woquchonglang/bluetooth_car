@@ -33,6 +33,8 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
 
 TaskFunction_t DETECT_Task;
 TaskHandle_t xOpenDetect_Handle = NULL;
+static uint32_t detect_state = 0;
+
 
 #define TEST_DEVICE_NAME            "ESP_YJY"
 #define TEST_MANUFACTURER_DATA_LEN  17
@@ -340,9 +342,15 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
             //ESP_LOGI(GATTS_TAG,"value:%p", param->write.value);
             if(param->write.value[3] == 0x00 && param->write.value[4] == 0x00 && param->write.value[5] == 0x00 ){
                      motor_stop();
-                     if(eTaskGetState(xOpenDetect_Handle) ==  eRunning ){
-                        vTaskDelete(xOpenDetect_Handle);
+                     if(detect_state == 1){
+                        detect_state = 0;
+                        vTaskSuspend(xOpenDetect_Handle);
+                        // xTaskNotify(xOpenDetect_Handle, detect_state, eSetBits);
+
+                        // ESP_LOGE(GATTS_TAG,"detect_state = %ld", detect_state);
                      }
+                        
+                     
 
             }
 
@@ -442,10 +450,15 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
             
             else if(param->write.value[1] == 0x01 && param->write.value[5] == 0x01){
 
-                if(eTaskGetState(xOpenDetect_Handle) ==  eInvalid){
-                    xTaskCreate(Detect_mode, "detect", 1024, NULL, 2, &xOpenDetect_Handle);
-                }
+                vTaskResume(xOpenDetect_Handle);
+                detect_state = 1;
 
+            //    if(detect_state == 0)
+            //    {
+            //         detect_state = 1;
+            //         xTaskNotify(xOpenDetect_Handle, detect_state, eSetValueWithOverwrite);
+
+            //    }
                     
 
             }
@@ -454,16 +467,16 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         example_write_event_env(gatts_if, &a_prepare_write_env, param);
         break;
     }
-    case ESP_GATTS_EXEC_WRITE_EVT:
-        ESP_LOGI(GATTS_TAG,"ESP_GATTS_EXEC_WRITE_EVT");
-        esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_OK, NULL);
-        example_exec_write_event_env(&a_prepare_write_env, param);
-        break;
+    // case ESP_GATTS_EXEC_WRITE_EVT:
+    //     ESP_LOGI(GATTS_TAG,"ESP_GATTS_EXEC_WRITE_EVT");
+    //     esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_OK, NULL);
+    //     example_exec_write_event_env(&a_prepare_write_env, param);
+    //     break;
     case ESP_GATTS_MTU_EVT:
         ESP_LOGI(GATTS_TAG, "ESP_GATTS_MTU_EVT, MTU %d", param->mtu.mtu);
         break;
-    case ESP_GATTS_UNREG_EVT:
-        break;
+    // case ESP_GATTS_UNREG_EVT:
+    //     break;
     case ESP_GATTS_CREATE_EVT:
         ESP_LOGI(GATTS_TAG, "CREATE_SERVICE_EVT, status %d,  service_handle %d\n", param->create.status, param->create.service_handle);
         gl_profile_tab[PROFILE_A_APP_ID].service_handle = param->create.service_handle;
@@ -591,11 +604,14 @@ void app_main(void)
     esp_err_t ret;
 
     // Initialize NVS.
-   nvs_flash_init();
+    nvs_flash_init();
 
-    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
+    esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
 
     motor_init();
+
+    xTaskCreate(Detect_mode, "detect", 2048, NULL, 5, &xOpenDetect_Handle);
+    vTaskSuspend(xOpenDetect_Handle);
 
     detect_gpio_init();
 
