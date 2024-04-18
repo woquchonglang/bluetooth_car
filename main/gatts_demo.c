@@ -1,19 +1,3 @@
-/*
- * SPDX-FileCopyrightText: 2021-2022 Espressif Systems (Shanghai) CO LTD
- *
- * SPDX-License-Identifier: Unlicense OR CC0-1.0
- */
-
-/****************************************************************************
-*
-* This demo showcases BLE GATT server. It can send adv data, be connected by client.
-* Run the gatt_client demo, the client demo will automatically connect to the gatt_server demo.
-* Client demo will enable gatt_server's notify after connection. The two devices will then exchange
-* data.
-*
-****************************************************************************/
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,26 +16,250 @@
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
 #include "bdc_motor.h"
+#include "detect.h"
 //#include "BLE.h"
-
+#include "Servo.h"
+#include "driver/gpio.h"
 #include "sdkconfig.h"
 
 #define GATTS_TAG "GATTS_DEMO"
 
-///Declare the static function
+#define SERVO_GPIO_1        8 
+#define SERVO_GPIO_2        9
+#define SERVO_GPIO_3        10
+
+#define SERVO_MIN_PULSEWIDTH_US 500  // Minimum pulse width in microsecond
+#define SERVO_MAX_PULSEWIDTH_US 2500  // Maximum pulse width in microsecond
+#define SERVO_MIN_DEGREE        -180   // Minimum angle
+#define SERVO_MAX_DEGREE        180    // Maximum angle
+
+static inline uint32_t angle_to_compare(int angle)
+{
+    return (angle - SERVO_MIN_DEGREE) * (SERVO_MAX_PULSEWIDTH_US - SERVO_MIN_PULSEWIDTH_US) / (SERVO_MAX_DEGREE - SERVO_MIN_DEGREE) + SERVO_MIN_PULSEWIDTH_US;
+}
+
+static int angle1 = 140;
+static int angle2 = 0;
+static int angle3 = (0);
+static int bi_state = 0;
+
+#define SERVO_MIN_PULSEWIDTH_US 500  // Minimum pulse width in microsecond
+#define SERVO_MAX_PULSEWIDTH_US 2500  // Maximum pulse width in microsecond
+#define SERVO_MIN_DEGREE        -180   // Minimum angle
+#define SERVO_MAX_DEGREE        180    // Maximum angle
+
+#define SERVO_PULSE_GPIO             0        // GPIO connects to the PWM signal line
+#define SERVO_TIMEBASE_RESOLUTION_HZ 1000000  // 1MHz, 1us per tick
+#define SERVO_TIMEBASE_PERIOD        20000    // 20000 ticks, 20ms
+
+
+mcpwm_timer_handle_t timer1 = NULL;
+mcpwm_timer_handle_t timer2 = NULL;
+mcpwm_timer_handle_t timer3 = NULL;
+
+
+mcpwm_oper_handle_t oper1 = NULL;
+mcpwm_oper_handle_t oper2 = NULL;
+mcpwm_oper_handle_t oper3 = NULL;
+
+
+static mcpwm_cmpr_handle_t comp1 = NULL;
+static mcpwm_cmpr_handle_t comp2 = NULL;
+static mcpwm_cmpr_handle_t comp3 = NULL;
+
+
+mcpwm_gen_handle_t gen1 = NULL;
+mcpwm_gen_handle_t gen2 = NULL;
+mcpwm_gen_handle_t gen3 = NULL;
+
+mcpwm_timer_config_t timer_config1 = {
+    .group_id = 0,
+    .clk_src = MCPWM_TIMER_CLK_SRC_DEFAULT,
+    .resolution_hz = SERVO_TIMEBASE_RESOLUTION_HZ,
+    .period_ticks = SERVO_TIMEBASE_PERIOD,
+    .count_mode = MCPWM_TIMER_COUNT_MODE_UP,
+};
+mcpwm_timer_config_t timer_config2 = {
+    .group_id = 1,
+    .clk_src = MCPWM_TIMER_CLK_SRC_DEFAULT,
+    .resolution_hz = SERVO_TIMEBASE_RESOLUTION_HZ,
+    .period_ticks = SERVO_TIMEBASE_PERIOD,
+    .count_mode = MCPWM_TIMER_COUNT_MODE_UP,
+};
+mcpwm_timer_config_t timer_config3 = {
+    .group_id = 1,
+    .clk_src = MCPWM_TIMER_CLK_SRC_DEFAULT,
+    .resolution_hz = SERVO_TIMEBASE_RESOLUTION_HZ,
+    .period_ticks = SERVO_TIMEBASE_PERIOD,
+    .count_mode = MCPWM_TIMER_COUNT_MODE_UP,
+};
+
+mcpwm_operator_config_t operator_config1 = {
+    .group_id = 0, // operator must be in the same group to the timer
+};
+mcpwm_operator_config_t operator_config2 = {
+    .group_id = 1, // operator must be in the same group to the timer
+    // .flags = update_gen_action_on_tep;
+};
+mcpwm_operator_config_t operator_config3 = {
+    .group_id = 1   , // operator must be in the same group to the timer
+};
+
+mcpwm_comparator_config_t comparator_config1 = {
+    .flags.update_cmp_on_tez = true,
+};
+mcpwm_comparator_config_t comparator_config2 = {
+    .flags.update_cmp_on_tez = true,
+};
+mcpwm_comparator_config_t comparator_config3 = {
+    .flags.update_cmp_on_tez = true,
+};
+
+mcpwm_generator_config_t generator_config1 = {
+    .gen_gpio_num = SERVO_GPIO_1,
+};
+mcpwm_generator_config_t generator_config2 = {
+    .gen_gpio_num = SERVO_GPIO_2,
+};
+mcpwm_generator_config_t generator_config3 = {
+    .gen_gpio_num = SERVO_GPIO_3,
+};
+
+void servo_init()
+{
+    mcpwm_new_timer(&timer_config1, &timer1);
+    mcpwm_new_timer(&timer_config2, &timer2);
+    mcpwm_new_timer(&timer_config3, &timer3);
+
+    mcpwm_new_operator(&operator_config1, &oper1);
+    mcpwm_new_operator(&operator_config2, &oper2);
+    mcpwm_new_operator(&operator_config3, &oper3);
+
+    mcpwm_operator_connect_timer(oper1, timer1);
+    mcpwm_operator_connect_timer(oper2, timer2);
+    mcpwm_operator_connect_timer(oper3, timer3);
+
+    mcpwm_new_comparator(oper1, &comparator_config1, &comp1);
+    mcpwm_new_comparator(oper2, &comparator_config2, &comp2);
+    mcpwm_new_comparator(oper3, &comparator_config3, &comp3);
+
+    mcpwm_new_generator(oper1, &generator_config1, &gen1);
+    mcpwm_new_generator(oper2, &generator_config2, &gen2);
+    mcpwm_new_generator(oper3, &generator_config3, &gen3);
+
+    mcpwm_comparator_set_compare_value(comp1, angle_to_compare(angle1));
+    mcpwm_comparator_set_compare_value(comp2, angle_to_compare(0));
+    mcpwm_comparator_set_compare_value(comp3, angle_to_compare(-90));
+
+    mcpwm_generator_set_action_on_timer_event(gen1,
+                                              MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, 
+                                              MCPWM_TIMER_EVENT_EMPTY, 
+                                              MCPWM_GEN_ACTION_HIGH));
+    mcpwm_generator_set_action_on_compare_event(gen1,
+                    MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, comp1, MCPWM_GEN_ACTION_LOW));
+    
+
+    mcpwm_generator_set_action_on_timer_event(gen2,
+                                              MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, 
+                                              MCPWM_TIMER_EVENT_EMPTY, 
+                                              MCPWM_GEN_ACTION_HIGH));
+    mcpwm_generator_set_action_on_compare_event(gen2,
+                    MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, comp2, MCPWM_GEN_ACTION_LOW));
+
+
+    mcpwm_generator_set_action_on_timer_event(gen3,
+                                              MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, 
+                                              MCPWM_TIMER_EVENT_EMPTY, 
+                                              MCPWM_GEN_ACTION_HIGH));
+    mcpwm_generator_set_action_on_compare_event(gen3,
+                    MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, comp3, MCPWM_GEN_ACTION_LOW));
+
+                    
+    mcpwm_timer_enable(timer1);
+    mcpwm_timer_enable(timer2);
+    mcpwm_timer_enable(timer3);
+
+    mcpwm_timer_start_stop(timer1, MCPWM_TIMER_START_NO_STOP);
+    mcpwm_timer_start_stop(timer2, MCPWM_TIMER_START_NO_STOP);
+    mcpwm_timer_start_stop(timer3, MCPWM_TIMER_START_NO_STOP);
+
+    // mcpwm_cmpr_handle_t cb_h = NULL;
+    // const mcpwm_comparator_event_callbacks_t  cb_t;
+    
+    // mcpwm_comparator_register_event_callbacks(cb_h,&cb_t,(void *)angle1);
+}
+
+
+void servo1_up_1(){
+    angle1 -= 1;
+    mcpwm_comparator_set_compare_value(comp1, angle_to_compare(angle1));
+    // ESP_LOGI(GATTS_TAG,"%ld",angle_to_compare(angle1));
+}
+void servo1_up_2(){
+    // mcpwm_comparator_set_compare_value(comp1, 1700);
+
+    angle1 -= 4;
+    mcpwm_comparator_set_compare_value(comp1, angle_to_compare(angle1));
+}
+void servo1_down_1(){
+   angle1 += 1;
+    mcpwm_comparator_set_compare_value(comp1, angle_to_compare(angle1));
+    // mcpwm_comparator_set_compare_value(comp1, 1480);
+}
+void servo1_down_2(){
+    mcpwm_comparator_set_compare_value(comp1, 1200);
+    angle1 += 2;
+    mcpwm_comparator_set_compare_value(comp1, angle_to_compare(angle1));
+}
+
+
+void servo2_up_1(){
+    // mcpwm_comparator_set_compare_value(comp2, 1600);
+    angle2 += 2;
+    mcpwm_comparator_set_compare_value(comp2, angle_to_compare(angle2));
+    ESP_LOGI(GATTS_TAG,"%ld",angle_to_compare(angle2));
+}
+void servo2_up_2(){
+    // mcpwm_comparator_set_compare_value(comp2, 2000);
+    angle2 += 2;
+    mcpwm_comparator_set_compare_value(comp2, angle_to_compare(angle2));
+    ESP_LOGI(GATTS_TAG,"%ld",angle_to_compare(angle2));
+}
+void servo2_down_1(){
+    // mcpwm_comparator_set_compare_value(comp2, 1200);
+    angle2 -=1;
+    mcpwm_comparator_set_compare_value(comp2, angle_to_compare(angle2));
+    ESP_LOGI(GATTS_TAG,"%ld",angle_to_compare(angle2));
+}
+void servo2_down_2(){
+    // mcpwm_comparator_set_compare_value(comp2, 500);
+     angle2 -=2;
+    mcpwm_comparator_set_compare_value(comp2, angle_to_compare(angle2));
+    // ESP_LOGI(GATTS_TAG,"%ld",angle_to_compare(angle2));
+}
+
+void servo_claw_open(){
+   mcpwm_comparator_set_compare_value(comp3, angle_to_compare(-70));
+
+}
+
+void servo_claw_close(){
+    mcpwm_comparator_set_compare_value(comp3, angle_to_compare(90));
+}
+
+
+
+
 static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
-static void gatts_profile_b_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
 
 #define GATTS_SERVICE_UUID_TEST_A   0x00FF
 #define GATTS_CHAR_UUID_TEST_A      0xFF01
 #define GATTS_DESCR_UUID_TEST_A     0x3333
 #define GATTS_NUM_HANDLE_TEST_A     4
 
-#define GATTS_SERVICE_UUID_TEST_B   0x00EE
-#define GATTS_CHAR_UUID_TEST_B      0xEE01
-#define GATTS_DESCR_UUID_TEST_B     0x2222
-#define GATTS_NUM_HANDLE_TEST_B     4
-
+TaskFunction_t DETECT_Task;
+TaskHandle_t xOpenDetect_Handle = NULL;
+static uint32_t detect_state = 0;
 
 
 #define TEST_DEVICE_NAME            "ESP_YJY"
@@ -63,7 +271,7 @@ static void gatts_profile_b_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
 
 static uint8_t char1_str[] = {0x11,0x22,0x33};
 static esp_gatt_char_prop_t a_property = 0;
-static esp_gatt_char_prop_t b_property = 0;
+// static esp_gatt_char_prop_t b_property = 0;
 
 static esp_attr_value_t gatts_demo_char1_val =
 {
@@ -168,10 +376,7 @@ static struct gatts_profile_inst gl_profile_tab[PROFILE_NUM] = {
         .gatts_cb = gatts_profile_a_event_handler,
         .gatts_if = ESP_GATT_IF_NONE,       /* Not get the gatt_if, so initial is ESP_GATT_IF_NONE */
     },
-    [PROFILE_B_APP_ID] = {
-        .gatts_cb = gatts_profile_b_event_handler,                   /* This demo does not implement, similar as profile A */
-        .gatts_if = ESP_GATT_IF_NONE,       /* Not get the gatt_if, so initial is ESP_GATT_IF_NONE */
-    },
+
 };
 
 typedef struct {
@@ -180,7 +385,7 @@ typedef struct {
 } prepare_type_env_t;
 
 static prepare_type_env_t a_prepare_write_env;
-static prepare_type_env_t b_prepare_write_env;
+// static prepare_type_env_t b_prepare_write_env;
 
 void example_write_event_env(esp_gatt_if_t gatts_if, prepare_type_env_t *prepare_write_env, esp_ble_gatts_cb_param_t *param);
 void example_exec_write_event_env(prepare_type_env_t *prepare_write_env, esp_ble_gatts_cb_param_t *param);
@@ -355,139 +560,321 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         break;
     }
     case ESP_GATTS_WRITE_EVT: {
-        ESP_LOGI(GATTS_TAG, "GATT_WRITE_EVT, conn_id %d, trans_id %" PRIu32 ", handle %d", param->write.conn_id, param->write.trans_id, param->write.handle);
+        //ESP_LOGI(GATTS_TAG, "GATT_WRITE_EVT, conn_id %d, trans_id %" PRIu32 ", handle %d", param->write.conn_id, param->write.trans_id, param->write.handle);
         if (!param->write.is_prep){
-            ESP_LOGI(GATTS_TAG, "GATT_WRITE_EVT, value len %d, value :", param->write.len);
+            //ESP_LOGI(GATTS_TAG, " value :");
             esp_log_buffer_hex(GATTS_TAG, param->write.value, param->write.len);
-            esp_log_buffer_char(GATTS_TAG, param->write.value, param->write.len);
-             ESP_LOGI(GATTS_TAG,"value:%d", *param->write.value);
-
-            if(param->write.value[1] == 0x01)
-            {
-               
-            }
-            if(param->write.value[1] == 0xff)
-            {
-                bdc_motor_set_speed(motor1,0);
-                bdc_motor_set_speed(motor2, 0);
-                bdc_motor_set_speed(motor3, 0);
-                bdc_motor_set_speed(motor4, 0);
-            }
-            if(param->write.value[1] == 0)
-            {
-                if(param->write.value[2] == 0x00 && param->write.value[4] == 0x00){
+            //esp_log_buffer_char(GATTS_TAG, param->write.value, param->write.len);
+            //ESP_LOGI(GATTS_TAG,"value:%p", param->write.value);
+            if(param->write.value[4] == 0x00 && param->write.value[7] == 0x00 ){
                      motor_stop();
+                     //mcpwm_comparator_set_compare_value(comp2, angle_to_compare(0));
+
+                     if(detect_state == 1){
+                        detect_state = 0;
+                        vTaskSuspend(xOpenDetect_Handle);
+                        // xTaskNotify(xOpenDetect_Handle, detect_state, eSetBits);
+
+                        // ESP_LOGE(GATTS_TAG,"detect_state = %ld", detect_state);
+                     }
+                     if(bi_state == 1){
+                        bi_state = 0;
+                        mcpwm_comparator_set_compare_value(comp3, angle_to_compare(-45));
+                        // xTaskNotify(xOpenDetect_Handle, detect_state, eSetBits);
+
+                        // ESP_LOGE(GATTS_TAG,"detect_state = %ld", detect_state);
+                     }
+            }
+
+            else if(param->write.value[1] == 0x02){         //夹取模式
+                
+
+
+                if(bi_state == 0){
+                    bi_state = 1;
+                    servo_claw_close();
                 }
-                if(param->write.value[2] == 0x00 && param->write.value[4] == 0x01){
-                     motor_forward1();
-                }
-                if(param->write.value[2] == 0x00 && param->write.value[4] == 0x02){
-                     motor_forward2();
-                }
-                if(param->write.value[2] == 0x00 && param->write.value[4] == 0xff){
-                     motor_retreat1();
-                }
-                if(param->write.value[2] == 0x00 && param->write.value[4] == 0xfe){
-                     motor_retreat2();
-                }
-                if(param->write.value[2] == 0x01 && param->write.value[4] == 0x01){
-                     motor_R_1();
-                }
-                if(param->write.value[2] == 0x02 && param->write.value[4] == 0x02){
-                     motor_R_2();
-                }
-                if(param->write.value[2] == 0xff && param->write.value[4] == 0xff){
-                     motor_L_1();
-                }
-                if(param->write.value[2] == 0xfe && param->write.value[4] == 0xfe){
-                     motor_L_2();
+
+                if (param->write.value[4] == 0x00 && param->write.value[7] == 0x02 )
+                {
+                    motor_stop();
+                    //mcpwm_comparator_set_compare_value(comp2, angle_to_compare(0));
+
                 }
                 
+                else if(param->write.value[3] == 0x00 && param->write.value[4] != 0x00 && param->write.value[7] != 0x00){
+                    if(param->write.value[4] == 0x01){
+                        motor_forward1();
+
+                    }
+                    else if(param->write.value[4] == 0x02 ){
+                        motor_forward2();
+
+                    }
+                    else if(param->write.value[4] == 0xff){
+                        motor_retreat1();
+
+                    }
+                    else if(param->write.value[4] == 0xfe){
+                        motor_retreat2();
+                    }
+                }
+
+                else if(param->write.value[3] != 0x00 && param->write.value[4] == 0x00 && param->write.value[7] != 0x00){
+                    if(param->write.value[3] == 0x01){
+                        motor_R_1();
+
+                    }
+                    else if(param->write.value[3] == 0x02){
+                        motor_R_2();
+
+                    }
+                    else if(param->write.value[3] == 0xff){
+                        motor_L_1();
+
+                    }
+
+                }
+
+                else if(param->write.value[3] != 0x00 && param->write.value[4] != 0x00 && param->write.value[7] == 0x02){
+                    if(param->write.value[3] == 0xff){
+                        motor_L_forward1();
+
+                    }
+                    else if(param->write.value[3] == 0xfe){
+                        motor_L_forward2();
+
+                    }
+                    else if(param->write.value[3] == 0x01){
+                        motor_R_retreat1();
+
+                    }
+                    else if(param->write.value[3] == 0x02){
+                        motor_R_retreat2();
+
+                    }
+                    
+                } 
+
+                else if(param->write.value[3] != 0x00 && param->write.value[4] != 0x00){
+                    if(param->write.value[4] == 0xff){
+                        motor_L_retreat1();
+                    }
+                    else if(param->write.value[4] == 0xfe){
+                        motor_L_retreat2();
+                    }
+                    else if(param->write.value[4] == 0x01){
+                        motor_R_forward1();
+                    }
+                    else if(param->write.value[4] == 0x02){
+                        motor_R_forward2();
+                    } 
+                }      
+
+                else if(param->write.value[2] != 0x00){
+                    if(param->write.value[2] == 0xff){
+                        motor_L_return1();
+                    }
+                    else if(param->write.value[2] == 0xfe){
+                        motor_L_return2();
+
+                    }
+                    else if( param->write.value[2] == 0x01){
+                        motor_R_return1();
+
+                    }
+                    else if( param->write.value[2] == 0x02){
+                        motor_R_return2();
+                    }
+                }
+
+                else if(param->write.value[5] != 0x00){
+                    if(param->write.value[5] == 0xff){
+                        servo1_down_1();
+                    }
+                    else if(param->write.value[5] == 0xfe){
+                        servo1_down_2();
+                    }
+                    else if( param->write.value[5] == 0x01){
+                        servo1_up_1();
+                    }
+                    else if( param->write.value[5] == 0x02){
+                        servo1_up_2();
+                    }
+                    
+                }
                 
-                // if(param->write.value[2] == 0x01 && param->write.value[4] == 0x02){
-                //      motor_R_forward2();
-                // }
-                // if(param->write.value[2] == 0x01 && param->write.value[4] == 0x02){
-                //      motor_R_forward2();
-                // }
-                // if(param->write.value[2] == 0x01 && param->write.value[4] == 0x02){
-                //      motor_R_forward2();
-                // }
-                // if(param->write.value[2] == 0x01 && param->write.value[4] == 0x02){
-                //      motor_R_forward2();
-                // }
-                // if(param->write.value[2] == 0x01 && param->write.value[4] == 0x02){
-                //      motor_R_forward2();
-                // }
+                else if(param->write.value[6] != 0x00){
+                    if(param->write.value[6] == 0xff){
+                        servo2_down_1();
+                    }
+                    else if(param->write.value[6] == 0xfe){
+                        servo2_down_2();
+                    }
+                    else if( param->write.value[6] == 0x01){
+                        servo2_up_1();
+                    }
+                    else if( param->write.value[6] == 0x02){
+                        servo2_up_2();
+                    }
                 
+                }
+
                 
 
             }
-            else{
-                if( param->write.value[4] == 0x01){
-                     motor_R_return1();
+
+
+
+
+
+            else if(param->write.value[3] == 0x00 && param->write.value[4] != 0x00 && param->write.value[7] != 0x00){
+                if(param->write.value[7] == 0x01){
+                    motor_forward1();
+
                 }
-                if( param->write.value[4] == 0x02){
-                     motor_R_return2();
+                else if(param->write.value[7] == 0x02 ){
+                    motor_forward2();
+
                 }
+                else if(param->write.value[7] == 0xff){
+                    motor_retreat1();
+
+                }
+                else if(param->write.value[7] == 0xfe){
+                    motor_retreat2();
+                }
+            }
+
+            else if(param->write.value[3] != 0x00 && param->write.value[4] == 0x00 && param->write.value[7] != 0x00){
+                if(param->write.value[3] == 0x01){
+                    motor_R_1();
+
+                }
+                else if(param->write.value[3] == 0x02){
+                    motor_R_2();
+
+                }
+                else if(param->write.value[3] == 0xff){
+                    motor_L_1();
+
+                }
+                else if(param->write.value[3] == 0xfe){
+                    motor_L_2();
+
+                }
+            }
+
+            else if(param->write.value[3] != 0x00 && param->write.value[4] != 0x00 && param->write.value[7] == 0x00){
+                if(param->write.value[3] == 0xff){
+                    motor_L_forward1();
+
+                }
+                else if(param->write.value[3] == 0xfe){
+                    motor_L_forward2();
+
+                }
+                else if(param->write.value[3] == 0x01){
+                    motor_R_retreat1();
+
+                }
+                else if(param->write.value[3] == 0x02){
+                    motor_R_retreat2();
+
+                }
+                
+            }
+
+            else if(param->write.value[4] != 0x00 && param->write.value[7] != 0x00){
                 if(param->write.value[4] == 0xff){
-                     motor_L_return1();
+                    motor_L_retreat1();
                 }
-                if(param->write.value[4] == 0xfe){
-                     motor_L_return2();
+                else if(param->write.value[4] == 0xfe){
+                    motor_L_retreat2();
                 }
-
+                else if(param->write.value[4] == 0x01){
+                    motor_R_forward1();
+                }
+                else if(param->write.value[4] == 0x02){
+                    motor_R_forward2();
+                }
             }
 
-            // if (gl_profile_tab[PROFILE_A_APP_ID].descr_handle == param->write.handle && param->write.len == 2){
-            //     uint16_t descr_value = param->write.value[1]<<8 | param->write.value[0];
-            //     if (descr_value == 0x0001){
-            //         if (a_property & ESP_GATT_CHAR_PROP_BIT_NOTIFY){
-            //             ESP_LOGI(GATTS_TAG, "notify enable");
-            //             uint8_t notify_data[15];
-            //             for (int i = 0; i < sizeof(notify_data); ++i)
-            //             {
-            //                 notify_data[i] = i%0xff;
-            //             }
-            //             //the size of notify_data[] need less than MTU size
-            //             esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, gl_profile_tab[PROFILE_A_APP_ID].char_handle,
-            //                                     sizeof(notify_data), notify_data, false);
-            //         }
-            //     }else if (descr_value == 0x0002){
-            //         if (a_property & ESP_GATT_CHAR_PROP_BIT_INDICATE){
-            //             ESP_LOGI(GATTS_TAG, "indicate enable");
-            //             uint8_t indicate_data[15];
-            //             for (int i = 0; i < sizeof(indicate_data); ++i)
-            //             {
-            //                 indicate_data[i] = i%0xff;
-            //             }
-            //             //the size of indicate_data[] need less than MTU size
-            //             esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, gl_profile_tab[PROFILE_A_APP_ID].char_handle,
-            //                                     sizeof(indicate_data), indicate_data, true);
-            //         }
-            //     }
-            //     else if (descr_value == 0x0000){
-            //         ESP_LOGI(GATTS_TAG, "notify/indicate disable ");
-            //     }else{
-            //         ESP_LOGE(GATTS_TAG, "unknown descr value");
-            //         esp_log_buffer_hex(GATTS_TAG, param->write.value, param->write.len);
-            //     }
+            else if(param->write.value[2] != 0x00){
+                if(param->write.value[2] == 0xff){
+                    motor_L_return1();
+                }
+                else if(param->write.value[2] == 0xfe){
+                    motor_L_return2();
 
-            // }
+                }
+                else if( param->write.value[2] == 0x01){
+                    motor_R_return1();
+
+                }
+                else if( param->write.value[2] == 0x02){
+                    motor_R_return2();
+                }
+                
+            }
+
+            else if(param->write.value[5] != 0x00){
+                if(param->write.value[5] == 0xff){
+                    servo1_down_1();
+                }
+                else if(param->write.value[5] == 0xfe){
+                    servo1_down_2();
+                }
+                else if( param->write.value[5] == 0x01){
+                    servo1_up_1();
+                }
+                else if( param->write.value[5] == 0x02){
+                    servo1_up_2();
+                }
+                
+            }
+
+            else if(param->write.value[6] != 0x00){
+                if(param->write.value[6] == 0xff){
+                    servo2_down_1();
+
+                }
+                else if(param->write.value[6] == 0xfe){
+                    servo2_down_2();
+                }
+                else if( param->write.value[6] == 0x01){
+                    servo2_up_1();
+
+                    mcpwm_comparator_set_compare_value(comp2, angle_to_compare(angle2));
+                }
+                else if( param->write.value[6] == 0x02){
+                    servo2_up_2();
+                }
+                
+            }
+            
+            else if(param->write.value[1] == 0x01){
+                vTaskResume(xOpenDetect_Handle);
+                detect_state = 1;
+            }
+
+
+
+
         }
         example_write_event_env(gatts_if, &a_prepare_write_env, param);
         break;
     }
-    case ESP_GATTS_EXEC_WRITE_EVT:
-        ESP_LOGI(GATTS_TAG,"ESP_GATTS_EXEC_WRITE_EVT");
-        esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_OK, NULL);
-        example_exec_write_event_env(&a_prepare_write_env, param);
-        break;
+    // case ESP_GATTS_EXEC_WRITE_EVT:
+    //     ESP_LOGI(GATTS_TAG,"ESP_GATTS_EXEC_WRITE_EVT");
+    //     esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_OK, NULL);
+    //     example_exec_write_event_env(&a_prepare_write_env, param);
+    //     break;
     case ESP_GATTS_MTU_EVT:
         ESP_LOGI(GATTS_TAG, "ESP_GATTS_MTU_EVT, MTU %d", param->mtu.mtu);
         break;
-    case ESP_GATTS_UNREG_EVT:
-        break;
+    // case ESP_GATTS_UNREG_EVT:
+    //     break;
     case ESP_GATTS_CREATE_EVT:
         ESP_LOGI(GATTS_TAG, "CREATE_SERVICE_EVT, status %d,  service_handle %d\n", param->create.status, param->create.service_handle);
         gl_profile_tab[PROFILE_A_APP_ID].service_handle = param->create.service_handle;
@@ -581,150 +968,6 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
     }
 }
 
-static void gatts_profile_b_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
-    switch (event) {
-    case ESP_GATTS_REG_EVT:
-        ESP_LOGI(GATTS_TAG, "REGISTER_APP_EVT, status %d, app_id %d\n", param->reg.status, param->reg.app_id);
-        gl_profile_tab[PROFILE_B_APP_ID].service_id.is_primary = true;
-        gl_profile_tab[PROFILE_B_APP_ID].service_id.id.inst_id = 0x00;
-        gl_profile_tab[PROFILE_B_APP_ID].service_id.id.uuid.len = ESP_UUID_LEN_16;
-        gl_profile_tab[PROFILE_B_APP_ID].service_id.id.uuid.uuid.uuid16 = GATTS_SERVICE_UUID_TEST_B;
-
-        esp_ble_gatts_create_service(gatts_if, &gl_profile_tab[PROFILE_B_APP_ID].service_id, GATTS_NUM_HANDLE_TEST_B);
-        break;
-    case ESP_GATTS_READ_EVT: {
-        ESP_LOGI(GATTS_TAG, "GATT_READ_EVT, conn_id %d, trans_id %" PRIu32 ", handle %d\n", param->read.conn_id, param->read.trans_id, param->read.handle);
-        esp_gatt_rsp_t rsp;
-        memset(&rsp, 0, sizeof(esp_gatt_rsp_t));
-        rsp.attr_value.handle = param->read.handle;
-        rsp.attr_value.len = 4;
-        rsp.attr_value.value[0] = 0xde;
-        rsp.attr_value.value[1] = 0xed;
-        rsp.attr_value.value[2] = 0xbe;
-        rsp.attr_value.value[3] = 0xef;
-        esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id,
-                                    ESP_GATT_OK, &rsp);
-        break;
-    }
-    case ESP_GATTS_WRITE_EVT: {
-        ESP_LOGI(GATTS_TAG, "GATT_WRITE_EVT, conn_id %d, trans_id %" PRIu32 ", handle %d\n", param->write.conn_id, param->write.trans_id, param->write.handle);
-        if (!param->write.is_prep){
-            ESP_LOGI(GATTS_TAG, "GATT_WRITE_EVT, value len %d, value :", param->write.len);
-            esp_log_buffer_hex(GATTS_TAG, param->write.value, param->write.len);
-            if (gl_profile_tab[PROFILE_B_APP_ID].descr_handle == param->write.handle && param->write.len == 2){
-                uint16_t descr_value= param->write.value[1]<<8 | param->write.value[0];
-                if (descr_value == 0x0001){
-                    if (b_property & ESP_GATT_CHAR_PROP_BIT_NOTIFY){
-                        ESP_LOGI(GATTS_TAG, "notify enable");
-                        uint8_t notify_data[15];
-                        for (int i = 0; i < sizeof(notify_data); ++i)
-                        {
-                            notify_data[i] = i%0xff;
-                        }
-                        //the size of notify_data[] need less than MTU size
-                        esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, gl_profile_tab[PROFILE_B_APP_ID].char_handle,
-                                                sizeof(notify_data), notify_data, false);
-                    }
-                }else if (descr_value == 0x0002){
-                    if (b_property & ESP_GATT_CHAR_PROP_BIT_INDICATE){
-                        ESP_LOGI(GATTS_TAG, "indicate enable");
-                        uint8_t indicate_data[15];
-                        for (int i = 0; i < sizeof(indicate_data); ++i)
-                        {
-                            indicate_data[i] = i%0xff;
-                        }
-                        //the size of indicate_data[] need less than MTU size
-                        esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, gl_profile_tab[PROFILE_B_APP_ID].char_handle,
-                                                sizeof(indicate_data), indicate_data, true);
-                    }
-                }
-                else if (descr_value == 0x0000){
-                    ESP_LOGI(GATTS_TAG, "notify/indicate disable ");
-                }else{
-                    ESP_LOGE(GATTS_TAG, "unknown value");
-                }
-
-            }
-        }
-        example_write_event_env(gatts_if, &b_prepare_write_env, param);
-        break;
-    }
-    case ESP_GATTS_EXEC_WRITE_EVT:
-        ESP_LOGI(GATTS_TAG,"ESP_GATTS_EXEC_WRITE_EVT");
-        esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_OK, NULL);
-        example_exec_write_event_env(&b_prepare_write_env, param);
-        break;
-    case ESP_GATTS_MTU_EVT:
-        ESP_LOGI(GATTS_TAG, "ESP_GATTS_MTU_EVT, MTU %d", param->mtu.mtu);
-        break;
-    case ESP_GATTS_UNREG_EVT:
-        break;
-    case ESP_GATTS_CREATE_EVT:
-        ESP_LOGI(GATTS_TAG, "CREATE_SERVICE_EVT, status %d,  service_handle %d\n", param->create.status, param->create.service_handle);
-        gl_profile_tab[PROFILE_B_APP_ID].service_handle = param->create.service_handle;
-        gl_profile_tab[PROFILE_B_APP_ID].char_uuid.len = ESP_UUID_LEN_16;
-        gl_profile_tab[PROFILE_B_APP_ID].char_uuid.uuid.uuid16 = GATTS_CHAR_UUID_TEST_B;
-
-        esp_ble_gatts_start_service(gl_profile_tab[PROFILE_B_APP_ID].service_handle);
-        b_property = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
-        esp_err_t add_char_ret =esp_ble_gatts_add_char( gl_profile_tab[PROFILE_B_APP_ID].service_handle, &gl_profile_tab[PROFILE_B_APP_ID].char_uuid,
-                                                        ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-                                                        b_property,
-                                                        NULL, NULL);
-        if (add_char_ret){
-            ESP_LOGE(GATTS_TAG, "add char failed, error code =%x",add_char_ret);
-        }
-        break;
-    case ESP_GATTS_ADD_INCL_SRVC_EVT:
-        break;
-    case ESP_GATTS_ADD_CHAR_EVT:
-        ESP_LOGI(GATTS_TAG, "ADD_CHAR_EVT, status %d,  attr_handle %d, service_handle %d\n",
-                 param->add_char.status, param->add_char.attr_handle, param->add_char.service_handle);
-
-        gl_profile_tab[PROFILE_B_APP_ID].char_handle = param->add_char.attr_handle;
-        gl_profile_tab[PROFILE_B_APP_ID].descr_uuid.len = ESP_UUID_LEN_16;
-        gl_profile_tab[PROFILE_B_APP_ID].descr_uuid.uuid.uuid16 = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
-        esp_ble_gatts_add_char_descr(gl_profile_tab[PROFILE_B_APP_ID].service_handle, &gl_profile_tab[PROFILE_B_APP_ID].descr_uuid,
-                                     ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-                                     NULL, NULL);
-        break;
-    case ESP_GATTS_ADD_CHAR_DESCR_EVT:
-        gl_profile_tab[PROFILE_B_APP_ID].descr_handle = param->add_char_descr.attr_handle;
-        ESP_LOGI(GATTS_TAG, "ADD_DESCR_EVT, status %d, attr_handle %d, service_handle %d\n",
-                 param->add_char_descr.status, param->add_char_descr.attr_handle, param->add_char_descr.service_handle);
-        break;
-    case ESP_GATTS_DELETE_EVT:
-        break;
-    case ESP_GATTS_START_EVT:
-        ESP_LOGI(GATTS_TAG, "SERVICE_START_EVT, status %d, service_handle %d\n",
-                 param->start.status, param->start.service_handle);
-        break;
-    case ESP_GATTS_STOP_EVT:
-        break;
-    case ESP_GATTS_CONNECT_EVT:
-        ESP_LOGI(GATTS_TAG, "CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:",
-                 param->connect.conn_id,
-                 param->connect.remote_bda[0], param->connect.remote_bda[1], param->connect.remote_bda[2],
-                 param->connect.remote_bda[3], param->connect.remote_bda[4], param->connect.remote_bda[5]);
-        gl_profile_tab[PROFILE_B_APP_ID].conn_id = param->connect.conn_id;
-        break;
-    case ESP_GATTS_CONF_EVT:
-        ESP_LOGI(GATTS_TAG, "ESP_GATTS_CONF_EVT status %d attr_handle %d", param->conf.status, param->conf.handle);
-        if (param->conf.status != ESP_GATT_OK){
-            esp_log_buffer_hex(GATTS_TAG, param->conf.value, param->conf.len);
-        }
-    break;
-    case ESP_GATTS_DISCONNECT_EVT:
-    case ESP_GATTS_OPEN_EVT:
-    case ESP_GATTS_CANCEL_OPEN_EVT:
-    case ESP_GATTS_CLOSE_EVT:
-    case ESP_GATTS_LISTEN_EVT:
-    case ESP_GATTS_CONGEST_EVT:
-    default:
-        break;
-    }
-}
-
 static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
     /* If event is register event, store the gatts_if for each profile */
@@ -754,70 +997,44 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     } while (0);
 }
 
+
+
+
+
 void app_main(void)
 {
-    esp_err_t ret;
 
-    // Initialize NVS.
-    ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK( ret );
-    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
+    nvs_flash_init();
+
+    esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
 
     motor_init();
-    
 
+    detect_gpio_init();
+
+    xTaskCreate(Detect_mode, "detect", 2048, NULL, 5, &xOpenDetect_Handle);
+    vTaskSuspend(xOpenDetect_Handle);
+
+    servo_init();
 
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    ret = esp_bt_controller_init(&bt_cfg);
-    if (ret) {
-        ESP_LOGE(GATTS_TAG, "%s initialize controller failed: %s\n", __func__, esp_err_to_name(ret));
-        return;
-    }
 
-    ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
-    if (ret) {
-        ESP_LOGE(GATTS_TAG, "%s enable controller failed: %s\n", __func__, esp_err_to_name(ret));
-        return;
-    }
-    ret = esp_bluedroid_init();
-    if (ret) {
-        ESP_LOGE(GATTS_TAG, "%s init bluetooth failed: %s\n", __func__, esp_err_to_name(ret));
-        return;
-    }
-    ret = esp_bluedroid_enable();
-    if (ret) {
-        ESP_LOGE(GATTS_TAG, "%s enable bluetooth failed: %s\n", __func__, esp_err_to_name(ret));
-        return;
-    }
+    esp_bt_controller_init(&bt_cfg);
 
-    ret = esp_ble_gatts_register_callback(gatts_event_handler);
-    if (ret){
-        ESP_LOGE(GATTS_TAG, "gatts register error, error code = %x", ret);
-        return;
-    }
-    ret = esp_ble_gap_register_callback(gap_event_handler);
-    if (ret){
-        ESP_LOGE(GATTS_TAG, "gap register error, error code = %x", ret);
-        return;
-    }
-    ret = esp_ble_gatts_app_register(PROFILE_A_APP_ID);
-    if (ret){
-        ESP_LOGE(GATTS_TAG, "gatts app register error, error code = %x", ret);
-        return;
-    }
-    ret = esp_ble_gatts_app_register(PROFILE_B_APP_ID);
-    if (ret){
-        ESP_LOGE(GATTS_TAG, "gatts app register error, error code = %x", ret);
-        return;
-    }
-    esp_err_t local_mtu_ret = esp_ble_gatt_set_local_mtu(500);
-    if (local_mtu_ret){
-        ESP_LOGE(GATTS_TAG, "set local  MTU failed, error code = %x", local_mtu_ret);
-    }
+    esp_bt_controller_enable(ESP_BT_MODE_BLE);
+
+    esp_bluedroid_init();
+
+    esp_bluedroid_enable();
+
+    esp_ble_gatts_register_callback(gatts_event_handler);
+
+    esp_ble_gap_register_callback(gap_event_handler);
+
+    esp_ble_gatts_app_register(PROFILE_A_APP_ID);
+
+    esp_ble_gatt_set_local_mtu(500);
+
 
     return;
 }
