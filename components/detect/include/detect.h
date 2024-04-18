@@ -3,6 +3,9 @@
 
 #include "bdc_motor.h"
 #include "driver/gpio.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
 
 
 

@@ -24,6 +24,232 @@
 
 #define GATTS_TAG "GATTS_DEMO"
 
+#define SERVO_GPIO_1        8 
+#define SERVO_GPIO_2        9
+#define SERVO_GPIO_3        10
+
+#define SERVO_MIN_PULSEWIDTH_US 500  // Minimum pulse width in microsecond
+#define SERVO_MAX_PULSEWIDTH_US 2500  // Maximum pulse width in microsecond
+#define SERVO_MIN_DEGREE        -180   // Minimum angle
+#define SERVO_MAX_DEGREE        180    // Maximum angle
+
+static inline uint32_t angle_to_compare(int angle)
+{
+    return (angle - SERVO_MIN_DEGREE) * (SERVO_MAX_PULSEWIDTH_US - SERVO_MIN_PULSEWIDTH_US) / (SERVO_MAX_DEGREE - SERVO_MIN_DEGREE) + SERVO_MIN_PULSEWIDTH_US;
+}
+
+static int angle1 = 140;
+static int angle2 = 0;
+static int angle3 = (0);
+static int bi_state = 0;
+
+#define SERVO_MIN_PULSEWIDTH_US 500  // Minimum pulse width in microsecond
+#define SERVO_MAX_PULSEWIDTH_US 2500  // Maximum pulse width in microsecond
+#define SERVO_MIN_DEGREE        -180   // Minimum angle
+#define SERVO_MAX_DEGREE        180    // Maximum angle
+
+#define SERVO_PULSE_GPIO             0        // GPIO connects to the PWM signal line
+#define SERVO_TIMEBASE_RESOLUTION_HZ 1000000  // 1MHz, 1us per tick
+#define SERVO_TIMEBASE_PERIOD        20000    // 20000 ticks, 20ms
+
+
+mcpwm_timer_handle_t timer1 = NULL;
+mcpwm_timer_handle_t timer2 = NULL;
+mcpwm_timer_handle_t timer3 = NULL;
+
+
+mcpwm_oper_handle_t oper1 = NULL;
+mcpwm_oper_handle_t oper2 = NULL;
+mcpwm_oper_handle_t oper3 = NULL;
+
+
+static mcpwm_cmpr_handle_t comp1 = NULL;
+static mcpwm_cmpr_handle_t comp2 = NULL;
+static mcpwm_cmpr_handle_t comp3 = NULL;
+
+
+mcpwm_gen_handle_t gen1 = NULL;
+mcpwm_gen_handle_t gen2 = NULL;
+mcpwm_gen_handle_t gen3 = NULL;
+
+mcpwm_timer_config_t timer_config1 = {
+    .group_id = 0,
+    .clk_src = MCPWM_TIMER_CLK_SRC_DEFAULT,
+    .resolution_hz = SERVO_TIMEBASE_RESOLUTION_HZ,
+    .period_ticks = SERVO_TIMEBASE_PERIOD,
+    .count_mode = MCPWM_TIMER_COUNT_MODE_UP,
+};
+mcpwm_timer_config_t timer_config2 = {
+    .group_id = 1,
+    .clk_src = MCPWM_TIMER_CLK_SRC_DEFAULT,
+    .resolution_hz = SERVO_TIMEBASE_RESOLUTION_HZ,
+    .period_ticks = SERVO_TIMEBASE_PERIOD,
+    .count_mode = MCPWM_TIMER_COUNT_MODE_UP,
+};
+mcpwm_timer_config_t timer_config3 = {
+    .group_id = 1,
+    .clk_src = MCPWM_TIMER_CLK_SRC_DEFAULT,
+    .resolution_hz = SERVO_TIMEBASE_RESOLUTION_HZ,
+    .period_ticks = SERVO_TIMEBASE_PERIOD,
+    .count_mode = MCPWM_TIMER_COUNT_MODE_UP,
+};
+
+mcpwm_operator_config_t operator_config1 = {
+    .group_id = 0, // operator must be in the same group to the timer
+};
+mcpwm_operator_config_t operator_config2 = {
+    .group_id = 1, // operator must be in the same group to the timer
+    // .flags = update_gen_action_on_tep;
+};
+mcpwm_operator_config_t operator_config3 = {
+    .group_id = 1   , // operator must be in the same group to the timer
+};
+
+mcpwm_comparator_config_t comparator_config1 = {
+    .flags.update_cmp_on_tez = true,
+};
+mcpwm_comparator_config_t comparator_config2 = {
+    .flags.update_cmp_on_tez = true,
+};
+mcpwm_comparator_config_t comparator_config3 = {
+    .flags.update_cmp_on_tez = true,
+};
+
+mcpwm_generator_config_t generator_config1 = {
+    .gen_gpio_num = SERVO_GPIO_1,
+};
+mcpwm_generator_config_t generator_config2 = {
+    .gen_gpio_num = SERVO_GPIO_2,
+};
+mcpwm_generator_config_t generator_config3 = {
+    .gen_gpio_num = SERVO_GPIO_3,
+};
+
+void servo_init()
+{
+    mcpwm_new_timer(&timer_config1, &timer1);
+    mcpwm_new_timer(&timer_config2, &timer2);
+    mcpwm_new_timer(&timer_config3, &timer3);
+
+    mcpwm_new_operator(&operator_config1, &oper1);
+    mcpwm_new_operator(&operator_config2, &oper2);
+    mcpwm_new_operator(&operator_config3, &oper3);
+
+    mcpwm_operator_connect_timer(oper1, timer1);
+    mcpwm_operator_connect_timer(oper2, timer2);
+    mcpwm_operator_connect_timer(oper3, timer3);
+
+    mcpwm_new_comparator(oper1, &comparator_config1, &comp1);
+    mcpwm_new_comparator(oper2, &comparator_config2, &comp2);
+    mcpwm_new_comparator(oper3, &comparator_config3, &comp3);
+
+    mcpwm_new_generator(oper1, &generator_config1, &gen1);
+    mcpwm_new_generator(oper2, &generator_config2, &gen2);
+    mcpwm_new_generator(oper3, &generator_config3, &gen3);
+
+    mcpwm_comparator_set_compare_value(comp1, angle_to_compare(angle1));
+    mcpwm_comparator_set_compare_value(comp2, angle_to_compare(0));
+    mcpwm_comparator_set_compare_value(comp3, angle_to_compare(-90));
+
+    mcpwm_generator_set_action_on_timer_event(gen1,
+                                              MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, 
+                                              MCPWM_TIMER_EVENT_EMPTY, 
+                                              MCPWM_GEN_ACTION_HIGH));
+    mcpwm_generator_set_action_on_compare_event(gen1,
+                    MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, comp1, MCPWM_GEN_ACTION_LOW));
+    
+
+    mcpwm_generator_set_action_on_timer_event(gen2,
+                                              MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, 
+                                              MCPWM_TIMER_EVENT_EMPTY, 
+                                              MCPWM_GEN_ACTION_HIGH));
+    mcpwm_generator_set_action_on_compare_event(gen2,
+                    MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, comp2, MCPWM_GEN_ACTION_LOW));
+
+
+    mcpwm_generator_set_action_on_timer_event(gen3,
+                                              MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, 
+                                              MCPWM_TIMER_EVENT_EMPTY, 
+                                              MCPWM_GEN_ACTION_HIGH));
+    mcpwm_generator_set_action_on_compare_event(gen3,
+                    MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, comp3, MCPWM_GEN_ACTION_LOW));
+
+                    
+    mcpwm_timer_enable(timer1);
+    mcpwm_timer_enable(timer2);
+    mcpwm_timer_enable(timer3);
+
+    mcpwm_timer_start_stop(timer1, MCPWM_TIMER_START_NO_STOP);
+    mcpwm_timer_start_stop(timer2, MCPWM_TIMER_START_NO_STOP);
+    mcpwm_timer_start_stop(timer3, MCPWM_TIMER_START_NO_STOP);
+
+    // mcpwm_cmpr_handle_t cb_h = NULL;
+    // const mcpwm_comparator_event_callbacks_t  cb_t;
+    
+    // mcpwm_comparator_register_event_callbacks(cb_h,&cb_t,(void *)angle1);
+}
+
+
+void servo1_up_1(){
+    angle1 -= 1;
+    mcpwm_comparator_set_compare_value(comp1, angle_to_compare(angle1));
+    // ESP_LOGI(GATTS_TAG,"%ld",angle_to_compare(angle1));
+}
+void servo1_up_2(){
+    // mcpwm_comparator_set_compare_value(comp1, 1700);
+
+    angle1 -= 4;
+    mcpwm_comparator_set_compare_value(comp1, angle_to_compare(angle1));
+}
+void servo1_down_1(){
+   angle1 += 1;
+    mcpwm_comparator_set_compare_value(comp1, angle_to_compare(angle1));
+    // mcpwm_comparator_set_compare_value(comp1, 1480);
+}
+void servo1_down_2(){
+    mcpwm_comparator_set_compare_value(comp1, 1200);
+    angle1 += 2;
+    mcpwm_comparator_set_compare_value(comp1, angle_to_compare(angle1));
+}
+
+
+void servo2_up_1(){
+    // mcpwm_comparator_set_compare_value(comp2, 1600);
+    angle2 += 2;
+    mcpwm_comparator_set_compare_value(comp2, angle_to_compare(angle2));
+    ESP_LOGI(GATTS_TAG,"%ld",angle_to_compare(angle2));
+}
+void servo2_up_2(){
+    // mcpwm_comparator_set_compare_value(comp2, 2000);
+    angle2 += 2;
+    mcpwm_comparator_set_compare_value(comp2, angle_to_compare(angle2));
+    ESP_LOGI(GATTS_TAG,"%ld",angle_to_compare(angle2));
+}
+void servo2_down_1(){
+    // mcpwm_comparator_set_compare_value(comp2, 1200);
+    angle2 -=1;
+    mcpwm_comparator_set_compare_value(comp2, angle_to_compare(angle2));
+    ESP_LOGI(GATTS_TAG,"%ld",angle_to_compare(angle2));
+}
+void servo2_down_2(){
+    // mcpwm_comparator_set_compare_value(comp2, 500);
+     angle2 -=2;
+    mcpwm_comparator_set_compare_value(comp2, angle_to_compare(angle2));
+    // ESP_LOGI(GATTS_TAG,"%ld",angle_to_compare(angle2));
+}
+
+void servo_claw_open(){
+   mcpwm_comparator_set_compare_value(comp3, angle_to_compare(-70));
+
+}
+
+void servo_claw_close(){
+    mcpwm_comparator_set_compare_value(comp3, angle_to_compare(90));
+}
+
+
+
+
 static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
 
 #define GATTS_SERVICE_UUID_TEST_A   0x00FF
@@ -340,8 +566,10 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
             esp_log_buffer_hex(GATTS_TAG, param->write.value, param->write.len);
             //esp_log_buffer_char(GATTS_TAG, param->write.value, param->write.len);
             //ESP_LOGI(GATTS_TAG,"value:%p", param->write.value);
-            if(param->write.value[3] == 0x00 && param->write.value[4] == 0x00 && param->write.value[5] == 0x00 ){
+            if(param->write.value[4] == 0x00 && param->write.value[7] == 0x00 ){
                      motor_stop();
+                     //mcpwm_comparator_set_compare_value(comp2, angle_to_compare(0));
+
                      if(detect_state == 1){
                         detect_state = 0;
                         vTaskSuspend(xOpenDetect_Handle);
@@ -349,47 +577,176 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
 
                         // ESP_LOGE(GATTS_TAG,"detect_state = %ld", detect_state);
                      }
-                        
-                     
+                     if(bi_state == 1){
+                        bi_state = 0;
+                        mcpwm_comparator_set_compare_value(comp3, angle_to_compare(-45));
+                        // xTaskNotify(xOpenDetect_Handle, detect_state, eSetBits);
 
+                        // ESP_LOGE(GATTS_TAG,"detect_state = %ld", detect_state);
+                     }
             }
 
-            else if(param->write.value[3] == 0x00 && param->write.value[4] != 0x00){
-                if(param->write.value[4] == 0x01 && param->write.value[5] == 0x01){
-                    motor_forward1();
+            else if(param->write.value[1] == 0x02){         //夹取模式
+                
 
-                }
-                else if(param->write.value[4] == 0x02 && param->write.value[5] == 0x02){
-                    motor_forward2();
 
+                if(bi_state == 0){
+                    bi_state = 1;
+                    servo_claw_close();
                 }
-                else if(param->write.value[4] == 0xff && param->write.value[5] == 0xff){
-                    motor_retreat1();
+
+                if (param->write.value[4] == 0x00 && param->write.value[7] == 0x02 )
+                {
+                    motor_stop();
+                    //mcpwm_comparator_set_compare_value(comp2, angle_to_compare(0));
 
                 }
                 
-                else if(param->write.value[4] == 0xfe && param->write.value[5] == 0xfe){
+                else if(param->write.value[3] == 0x00 && param->write.value[4] != 0x00 && param->write.value[7] != 0x00){
+                    if(param->write.value[4] == 0x01){
+                        motor_forward1();
+
+                    }
+                    else if(param->write.value[4] == 0x02 ){
+                        motor_forward2();
+
+                    }
+                    else if(param->write.value[4] == 0xff){
+                        motor_retreat1();
+
+                    }
+                    else if(param->write.value[4] == 0xfe){
+                        motor_retreat2();
+                    }
+                }
+
+                else if(param->write.value[3] != 0x00 && param->write.value[4] == 0x00 && param->write.value[7] != 0x00){
+                    if(param->write.value[3] == 0x01){
+                        motor_R_1();
+
+                    }
+                    else if(param->write.value[3] == 0x02){
+                        motor_R_2();
+
+                    }
+                    else if(param->write.value[3] == 0xff){
+                        motor_L_1();
+
+                    }
+
+                }
+
+                else if(param->write.value[3] != 0x00 && param->write.value[4] != 0x00 && param->write.value[7] == 0x02){
+                    if(param->write.value[3] == 0xff){
+                        motor_L_forward1();
+
+                    }
+                    else if(param->write.value[3] == 0xfe){
+                        motor_L_forward2();
+
+                    }
+                    else if(param->write.value[3] == 0x01){
+                        motor_R_retreat1();
+
+                    }
+                    else if(param->write.value[3] == 0x02){
+                        motor_R_retreat2();
+
+                    }
+                    
+                } 
+
+                else if(param->write.value[3] != 0x00 && param->write.value[4] != 0x00){
+                    if(param->write.value[4] == 0xff){
+                        motor_L_retreat1();
+                    }
+                    else if(param->write.value[4] == 0xfe){
+                        motor_L_retreat2();
+                    }
+                    else if(param->write.value[4] == 0x01){
+                        motor_R_forward1();
+                    }
+                    else if(param->write.value[4] == 0x02){
+                        motor_R_forward2();
+                    } 
+                }      
+
+                else if(param->write.value[2] != 0x00){
+                    if(param->write.value[2] == 0xff){
+                        motor_L_return1();
+                    }
+                    else if(param->write.value[2] == 0xfe){
+                        motor_L_return2();
+
+                    }
+                    else if( param->write.value[2] == 0x01){
+                        motor_R_return1();
+
+                    }
+                    else if( param->write.value[2] == 0x02){
+                        motor_R_return2();
+                    }
+                }
+
+                else if(param->write.value[5] != 0x00){
+                    if(param->write.value[5] == 0xff){
+                        servo1_down_1();
+                    }
+                    else if(param->write.value[5] == 0xfe){
+                        servo1_down_2();
+                    }
+                    else if( param->write.value[5] == 0x01){
+                        servo1_up_1();
+                    }
+                    else if( param->write.value[5] == 0x02){
+                        servo1_up_2();
+                    }
+                    
+                }
+                
+                else if(param->write.value[6] != 0x00){
+                    if(param->write.value[6] == 0xff){
+                        servo2_down_1();
+                    }
+                    else if(param->write.value[6] == 0xfe){
+                        servo2_down_2();
+                    }
+                    else if( param->write.value[6] == 0x01){
+                        servo2_up_1();
+                    }
+                    else if( param->write.value[6] == 0x02){
+                        servo2_up_2();
+                    }
+                
+                }
+
+                
+
+            }
+
+
+
+
+
+            else if(param->write.value[3] == 0x00 && param->write.value[4] != 0x00 && param->write.value[7] != 0x00){
+                if(param->write.value[7] == 0x01){
+                    motor_forward1();
+
+                }
+                else if(param->write.value[7] == 0x02 ){
+                    motor_forward2();
+
+                }
+                else if(param->write.value[7] == 0xff){
+                    motor_retreat1();
+
+                }
+                else if(param->write.value[7] == 0xfe){
                     motor_retreat2();
                 }
             }
 
-            else if(param->write.value[5] != 0x00 && param->write.value[4] != 0x00){
-                if(param->write.value[3] == 0xff){
-                    motor_L_retreat1();
-                }
-                else if(param->write.value[3] == 0xfe){
-                    motor_L_retreat2();
-                }
-                else if(param->write.value[3] == 0x01){
-                    motor_R_forward1();
-                }
-                else if(param->write.value[3] == 0x02){
-                    motor_R_forward2();
-                }
-
-            }
-
-            else if(param->write.value[4] == 0x00 && param->write.value[3] != 0x00){
+            else if(param->write.value[3] != 0x00 && param->write.value[4] == 0x00 && param->write.value[7] != 0x00){
                 if(param->write.value[3] == 0x01){
                     motor_R_1();
 
@@ -408,8 +765,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
                 }
             }
 
-            else if(param->write.value[5] == 0x00){
-
+            else if(param->write.value[3] != 0x00 && param->write.value[4] != 0x00 && param->write.value[7] == 0x00){
                 if(param->write.value[3] == 0xff){
                     motor_L_forward1();
 
@@ -429,39 +785,81 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
                 
             }
 
+            else if(param->write.value[4] != 0x00 && param->write.value[7] != 0x00){
+                if(param->write.value[4] == 0xff){
+                    motor_L_retreat1();
+                }
+                else if(param->write.value[4] == 0xfe){
+                    motor_L_retreat2();
+                }
+                else if(param->write.value[4] == 0x01){
+                    motor_R_forward1();
+                }
+                else if(param->write.value[4] == 0x02){
+                    motor_R_forward2();
+                }
+            }
+
             else if(param->write.value[2] != 0x00){
-                if( param->write.value[5] == 0x01){
-                    motor_R_return1();
-
-                }
-                else if( param->write.value[5] == 0x02){
-                    motor_R_return2();
-
-                }
-                else if(param->write.value[5] == 0xff){
+                if(param->write.value[2] == 0xff){
                     motor_L_return1();
-
                 }
-                else if(param->write.value[5] == 0xfe){
+                else if(param->write.value[2] == 0xfe){
                     motor_L_return2();
 
                 }
+                else if( param->write.value[2] == 0x01){
+                    motor_R_return1();
+
+                }
+                else if( param->write.value[2] == 0x02){
+                    motor_R_return2();
+                }
+                
+            }
+
+            else if(param->write.value[5] != 0x00){
+                if(param->write.value[5] == 0xff){
+                    servo1_down_1();
+                }
+                else if(param->write.value[5] == 0xfe){
+                    servo1_down_2();
+                }
+                else if( param->write.value[5] == 0x01){
+                    servo1_up_1();
+                }
+                else if( param->write.value[5] == 0x02){
+                    servo1_up_2();
+                }
+                
+            }
+
+            else if(param->write.value[6] != 0x00){
+                if(param->write.value[6] == 0xff){
+                    servo2_down_1();
+
+                }
+                else if(param->write.value[6] == 0xfe){
+                    servo2_down_2();
+                }
+                else if( param->write.value[6] == 0x01){
+                    servo2_up_1();
+
+                    mcpwm_comparator_set_compare_value(comp2, angle_to_compare(angle2));
+                }
+                else if( param->write.value[6] == 0x02){
+                    servo2_up_2();
+                }
+                
             }
             
-            else if(param->write.value[1] == 0x01 && param->write.value[5] == 0x01){
-
+            else if(param->write.value[1] == 0x01){
                 vTaskResume(xOpenDetect_Handle);
                 detect_state = 1;
-
-            //    if(detect_state == 0)
-            //    {
-            //         detect_state = 1;
-            //         xTaskNotify(xOpenDetect_Handle, detect_state, eSetValueWithOverwrite);
-
-            //    }
-                    
-
             }
+
+
+
 
         }
         example_write_event_env(gatts_if, &a_prepare_write_env, param);
@@ -599,68 +997,44 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     } while (0);
 }
 
+
+
+
+
 void app_main(void)
 {
-    esp_err_t ret;
 
-    // Initialize NVS.
     nvs_flash_init();
 
     esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
 
     motor_init();
 
+    detect_gpio_init();
+
     xTaskCreate(Detect_mode, "detect", 2048, NULL, 5, &xOpenDetect_Handle);
     vTaskSuspend(xOpenDetect_Handle);
-
-    detect_gpio_init();
 
     servo_init();
 
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
 
-    ret = esp_bt_controller_init(&bt_cfg);
-    if (ret) {
-        ESP_LOGE(GATTS_TAG, "%s initialize controller failed: %s\n", __func__, esp_err_to_name(ret));
-        return;
-    }
+    esp_bt_controller_init(&bt_cfg);
 
-    ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
-    if (ret) {
-        ESP_LOGE(GATTS_TAG, "%s enable controller failed: %s\n", __func__, esp_err_to_name(ret));
-        return;
-    }
-    ret = esp_bluedroid_init();
-    if (ret) {
-        ESP_LOGE(GATTS_TAG, "%s init bluetooth failed: %s\n", __func__, esp_err_to_name(ret));
-        return;
-    }
-    ret = esp_bluedroid_enable();
-    if (ret) {
-        ESP_LOGE(GATTS_TAG, "%s enable bluetooth failed: %s\n", __func__, esp_err_to_name(ret));
-        return;
-    }
+    esp_bt_controller_enable(ESP_BT_MODE_BLE);
 
-    ret = esp_ble_gatts_register_callback(gatts_event_handler);
-    if (ret){
-        ESP_LOGE(GATTS_TAG, "gatts register error, error code = %x", ret);
-        return;
-    }
-    ret = esp_ble_gap_register_callback(gap_event_handler);
-    if (ret){
-        ESP_LOGE(GATTS_TAG, "gap register error, error code = %x", ret);
-        return;
-    }
-    ret = esp_ble_gatts_app_register(PROFILE_A_APP_ID);
-    if (ret){
-        ESP_LOGE(GATTS_TAG, "gatts app register error, error code = %x", ret);
-        return;
-    }
+    esp_bluedroid_init();
 
-    esp_err_t local_mtu_ret = esp_ble_gatt_set_local_mtu(500);
-    if (local_mtu_ret){
-        ESP_LOGE(GATTS_TAG, "set local  MTU failed, error code = %x", local_mtu_ret);
-    }
+    esp_bluedroid_enable();
+
+    esp_ble_gatts_register_callback(gatts_event_handler);
+
+    esp_ble_gap_register_callback(gap_event_handler);
+
+    esp_ble_gatts_app_register(PROFILE_A_APP_ID);
+
+    esp_ble_gatt_set_local_mtu(500);
+
 
     return;
 }

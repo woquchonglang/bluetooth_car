@@ -1,8 +1,6 @@
 
 #include "detect.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_log.h"
+
 
 #define DETECT "DETECT"
 
@@ -11,9 +9,15 @@
 #define s3 gpio_get_level(GPIO_NUM_13)
 #define s4 gpio_get_level(GPIO_NUM_14)
 
+#define left_state 1
+#define right_state 2
+#define straight_right 3
+#define straight_left 4
+#define straight_state 0
+
 // #define Condition (l1)*1000+(l2)*100+(r2)*10+(r1)
 
-#define Condition ((s1<<3) | (s2<<2) | (s3<<1) | (s4))
+#define condition ((s1<<3) | (s2<<2) | (s3<<1) | (s4))
 
 void detect_gpio_init()
 {
@@ -33,89 +37,99 @@ void Detect_mode(){
 
 	ESP_LOGE(DETECT,"detect create");
 
-	// detect_state = ulTaskNotifyTake(pdTRUE, portMAX_DELAY );
+	int last_move = straight_state;
+	int x=0;
 
 	while(1)
 	{
 
-			//ESP_LOGE(DETECT,"%d",Condition);
+		if(last_move == straight_state)
+		{
+			motor_forward1();
+
+			if(condition == 8 || condition == 14)
+			{
+				last_move = left_state;
+			}
+			else if(condition == 1 || condition == 7)
+			{
+				last_move = right_state;
+			}
+			else if(condition == 6 || condition == 15)
+			{
+				last_move = straight_state;
+			}
+			else if(condition == 2)
+			{
+				last_move = straight_right;
+
+			}
+			else if(condition == 4)
+			{
+				last_move = straight_left;
+			}
+
+
+		}
+
+
+		else if(last_move == right_state)
+		{
+			if(x==0){
+
+			motor_forward1();
+			vTaskDelay(120/portTICK_PERIOD_MS);
+			x++;
+			}
+
+			if(condition == 6||condition == 2)
+			{
+				last_move=straight_state;
+				x--;
+			}
+			motor_R_return1();
 			
-			if(Condition==0 || Condition==9){
-					motor_forward1();
-			}
+		}
 
-			if(Condition==15){
-					motor_stop();
-			}
-	
-			if(Condition==12 || Condition==14 || Condition==10 || Condition==8){
-					motor_R_return1();
-			}
 
-			// if(Condition==8){
-			// 		motor_R_return2();
-			// }
-
-			if(Condition==5 || Condition==7 || Condition==3 || Condition==1){
-					motor_L_return1();
+		else if(last_move == left_state)
+		{
+			if(x==0){
+				motor_forward1();
+				vTaskDelay(120/portTICK_PERIOD_MS);
+				x++;
 			}
-
-			// if(Condition==1){
-			// 		motor_L_return2();
-			// }
+			if(condition == 6 || condition == 4)
+			{
+				last_move=straight_state;
+				x--;
+			}
+			motor_L_return1();
 			
+		}
+
+
+		else if(last_move == straight_left)
+		{
+			motor_LS_return();
 			vTaskDelay(10/portTICK_PERIOD_MS);
+			last_move = 0;
+		}
+
+
+		else if(last_move == straight_right)
+		{
+			motor_RS_return();
+			vTaskDelay(10/portTICK_PERIOD_MS);
+			last_move = 0;
+		}
+		vTaskDelay(10/portTICK_PERIOD_MS);
+
+		
 
 	}
 
 
 }
 
-//feng
-// void Detect_mode(){	
 
-// 			if(Condition==1111||Condition==110){
-// 					motor_forward_detect();
-// 			}
-// 			if(Condition==1100||Condition==1110||Condition==1010){
-// 					motor_L_return1();
-// 			}
-// 			if(Condition==101||Condition==111||Condition==11){
-// 					motor_R_return1();
-// 			}
-// 			if(Condition==1000){
-// 					motor_L_return2();
-// 			}
-// 			if(Condition==1)
-// 					motor_R_return2();
-
-// }
-
-//yin
-// void Detect_mode(){
-
-// 			if(Condition==1111){
-// 					motor_stop();
-// 			}
-
-// 			if(Condition==0 || Condition==0110){
-// 					motor_forward1();
-// 			}
-					
-// 			if(Condition==1100||Condition==1110||Condition==1010){
-// 					motor_R_return1();
-// 			}
-
-// 			if(Condition==1000){
-// 					motor_R_return2();
-// 			}
-
-// 			if(Condition==101||Condition==111||Condition==11){
-// 					motor_L_return1();
-// 			}
-
-// 			if(Condition==1){
-// 					motor_l_return2();
-// 			}	
-
-// }

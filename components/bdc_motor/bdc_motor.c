@@ -1,358 +1,491 @@
-/*
- * SPDX-FileCopyrightText: 2022 Espressif Systems (Shanghai) CO LTD
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-#include <stdlib.h>
-#include <string.h>
-#include <sys/cdefs.h>
-#include "esp_log.h"
-#include "esp_check.h"
+
 #include "bdc_motor.h"
-#include "bdc_motor_interface.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-
-static const char *TAG = "bdc_motor";
-
-esp_err_t bdc_motor_enable(bdc_motor_handle_t motor)
-{
-    ESP_RETURN_ON_FALSE(motor, ESP_ERR_INVALID_ARG, TAG, "invalid argument");
-    return motor->enable(motor);
-}
-
-esp_err_t bdc_motor_disable(bdc_motor_handle_t motor)
-{
-    ESP_RETURN_ON_FALSE(motor, ESP_ERR_INVALID_ARG, TAG, "invalid argument");
-    return motor->disable(motor);
-}
-
-esp_err_t bdc_motor_set_speed(bdc_motor_handle_t motor, uint32_t speed)
-{
-    ESP_RETURN_ON_FALSE(motor, ESP_ERR_INVALID_ARG, TAG, "invalid argument");
-    return motor->set_speed(motor, speed);
-}
-
-esp_err_t bdc_motor_forward(bdc_motor_handle_t motor)
-{
-    ESP_RETURN_ON_FALSE(motor, ESP_ERR_INVALID_ARG, TAG, "invalid argument");
-    return motor->forward(motor);
-}
-
-esp_err_t bdc_motor_reverse(bdc_motor_handle_t motor)
-{
-    ESP_RETURN_ON_FALSE(motor, ESP_ERR_INVALID_ARG, TAG, "invalid argument");
-    return motor->reverse(motor);
-}
-
-esp_err_t bdc_motor_coast(bdc_motor_handle_t motor)
-{
-    ESP_RETURN_ON_FALSE(motor, ESP_ERR_INVALID_ARG, TAG, "invalid argument");
-    return motor->coast(motor);
-}
-
-esp_err_t bdc_motor_brake(bdc_motor_handle_t motor)
-{
-    ESP_RETURN_ON_FALSE(motor, ESP_ERR_INVALID_ARG, TAG, "invalid argument");
-    return motor->brake(motor);
-}
-
-esp_err_t bdc_motor_del(bdc_motor_handle_t motor)
-{
-    ESP_RETURN_ON_FALSE(motor, ESP_ERR_INVALID_ARG, TAG, "invalid argument");
-    return motor->del(motor);
-}
-
-
-bdc_motor_handle_t motor1 = NULL;
-bdc_motor_handle_t motor2 = NULL;
-bdc_motor_handle_t motor3 = NULL;
-bdc_motor_handle_t motor4 = NULL;
+ #include "ledc.h"
 
 void motor_init()
- {
-    ESP_LOGI(TAG, "Create DC motor");
-    bdc_motor_config_t motor_config_1 = {
-        .pwm_freq_hz = BDC_MCPWM_FREQ_HZ,
-        .pwma_gpio_num = BDC_MCPWM_GPIO_L1_A,
-        .pwmb_gpio_num =  BDC_MCPWM_GPIO_L1_B,
+{
+    ledc_timer_config_t ledc_timer0 = {
+        .duty_resolution = LEDC_DUTY_RES, // resolution of PWM duty
+        .freq_hz = LEDC_FREQUENCY,                      // frequency of PWM signal
+        .speed_mode = LEDC_LS_MODE,           // timer mode
+        .timer_num = LEDC_LS_TIMER0,            // timer index
+        .clk_cfg = LEDC_CLK,              // Auto select the source clock
+        
     };
-    bdc_motor_config_t motor_config_2 = {
-        .pwm_freq_hz = BDC_MCPWM_FREQ_HZ,
-        .pwma_gpio_num = BDC_MCPWM_GPIO_L2_A,
-        .pwmb_gpio_num =  BDC_MCPWM_GPIO_L2_B,
+    ledc_timer_config_t ledc_timer1 = {
+        .duty_resolution = LEDC_DUTY_RES, // resolution of PWM duty
+        .freq_hz = LEDC_FREQUENCY,                      // frequency of PWM signal
+        .speed_mode = LEDC_LS_MODE,           // timer mode
+        .timer_num = LEDC_LS_TIMER1,            // timer index
+        .clk_cfg = LEDC_CLK,              // Auto select the source clock
+        
     };
-    bdc_motor_config_t motor_config_3 = {
-        .pwm_freq_hz = BDC_MCPWM_FREQ_HZ,
-        .pwma_gpio_num = BDC_MCPWM_GPIO_R1_A,
-        .pwmb_gpio_num =  BDC_MCPWM_GPIO_R1_B,
+    ledc_timer_config_t ledc_timer2 = {
+        .duty_resolution = LEDC_DUTY_RES, // resolution of PWM duty
+        .freq_hz = LEDC_FREQUENCY,                      // frequency of PWM signal
+        .speed_mode = LEDC_LS_MODE,           // timer mode
+        .timer_num = LEDC_LS_TIMER2,            // timer index
+        .clk_cfg = LEDC_CLK,              // Auto select the source clock
+        
     };
-    bdc_motor_config_t motor_config_4 = {
-        .pwm_freq_hz = BDC_MCPWM_FREQ_HZ,
-        .pwma_gpio_num = BDC_MCPWM_GPIO_R2_A,
-        .pwmb_gpio_num =  BDC_MCPWM_GPIO_R2_B,
-    };
-    bdc_motor_mcpwm_config_t mcpwm_config_1 = {
-        .group_id = 0,
-        .resolution_hz = BDC_MCPWM_TIMER_RESOLUTION_HZ,
-    };
-    bdc_motor_mcpwm_config_t mcpwm_config_2 = {
-        .group_id = 0,
-        .resolution_hz = BDC_MCPWM_TIMER_RESOLUTION_HZ,
-    };
-    bdc_motor_mcpwm_config_t mcpwm_config_3 = {
-        .group_id = 1,
-        .resolution_hz = BDC_MCPWM_TIMER_RESOLUTION_HZ,
-    };
-    bdc_motor_mcpwm_config_t mcpwm_config_4 = {
-        .group_id = 1,
-        .resolution_hz = BDC_MCPWM_TIMER_RESOLUTION_HZ,
+    ledc_timer_config_t ledc_timer3 = {
+        .duty_resolution = LEDC_DUTY_RES, // resolution of PWM duty
+        .freq_hz = LEDC_FREQUENCY,                      // frequency of PWM signal
+        .speed_mode = LEDC_LS_MODE,           // timer mode
+        .timer_num = LEDC_LS_TIMER3,            // timer index
+        .clk_cfg = LEDC_CLK,              // Auto select the source clock
+        
     };
 
-    bdc_motor_new_mcpwm_device(&motor_config_1, &mcpwm_config_1, &motor1);
-    bdc_motor_new_mcpwm_device(&motor_config_2, &mcpwm_config_2, &motor2);
-    bdc_motor_new_mcpwm_device(&motor_config_3, &mcpwm_config_3, &motor3);
-    bdc_motor_new_mcpwm_device(&motor_config_4, &mcpwm_config_4, &motor4);
+    ledc_timer_config(&ledc_timer0);
+    ledc_timer_config(&ledc_timer1);
+    ledc_timer_config(&ledc_timer2);
+    ledc_timer_config(&ledc_timer3);
 
-    bdc_motor_enable(motor1);
-    bdc_motor_enable(motor2);
-    bdc_motor_enable(motor3);
-    bdc_motor_enable(motor4);
+    ledc_channel_config_t ledc_channel_0 ={
+            .channel    = L1_0,
+            .duty       = 0,
+            .gpio_num   = L1_0_GPIO,
+            .speed_mode = LEDC_LS_MODE,
+            .hpoint     = 0,
+            .timer_sel  = LEDC_LS_TIMER0,
+
+        };
+    ledc_channel_config_t ledc_channel_1 ={
+            .channel    = L1_1,
+            .duty       = 0,
+            .gpio_num   = L1_1_GPIO,
+            .speed_mode = LEDC_LS_MODE,
+            .hpoint     = 0,
+            .timer_sel  = LEDC_LS_TIMER0,
+
+        };
+    ledc_channel_config_t ledc_channel_2 ={
+            .channel    = L2_0,
+            .duty       = 0,
+            .gpio_num   = 6,
+            .speed_mode = LEDC_LS_MODE,
+            .hpoint     = 0,
+            .timer_sel  = LEDC_LS_TIMER1,
+
+        };
+    ledc_channel_config_t ledc_channel_3 ={
+            .channel    = L2_1,
+            .duty       = 0,
+            .gpio_num   = 7,
+            .speed_mode = LEDC_LS_MODE,
+            .hpoint     = 0,
+            .timer_sel  = LEDC_LS_TIMER1,
+
+        };
+    ledc_channel_config_t ledc_channel_4 ={
+            .channel    = R1_0,
+            .duty       = 0,
+            .gpio_num   = R1_0_GPIO,
+            .speed_mode = LEDC_LS_MODE,
+            .hpoint     = 0,
+            .timer_sel  = LEDC_LS_TIMER2,
+
+        };
+    ledc_channel_config_t ledc_channel_5 ={
+            .channel    = R1_1,
+            .duty       = 0,
+            .gpio_num   = R1_1_GPIO,
+            .speed_mode = LEDC_LS_MODE,
+            .hpoint     = 0,
+            .timer_sel  = LEDC_LS_TIMER2,
+
+        };
+    ledc_channel_config_t ledc_channel_6 ={
+            .channel    = R2_0,
+            .duty       = 0,
+            .gpio_num   = R2_0_GPIO,
+            .speed_mode = LEDC_LS_MODE,
+            .hpoint     = 0,
+            .timer_sel  = LEDC_LS_TIMER3,
+
+        };
+    ledc_channel_config_t ledc_channel_7 ={
+            .channel    = R2_1,
+            .duty       = 0,
+            .gpio_num   = R2_1_GPIO,
+            .speed_mode = LEDC_LS_MODE,
+            .hpoint     = 0,
+            .timer_sel  = LEDC_LS_TIMER3,
+
+        };
 
 
-   
+    ledc_channel_config(&ledc_channel_0);
+    ledc_channel_config(&ledc_channel_1);
+    ledc_channel_config(&ledc_channel_2);
+    ledc_channel_config(&ledc_channel_3);
+    ledc_channel_config(&ledc_channel_4);
+    ledc_channel_config(&ledc_channel_5);
+    ledc_channel_config(&ledc_channel_6);
+    ledc_channel_config(&ledc_channel_7);
+    
+
+
 }
 
+
+void motor_update()
+{
+    ledc_update_duty(LEDC_LS_MODE, L1_0);
+    ledc_update_duty(LEDC_LS_MODE, L2_0);
+    ledc_update_duty(LEDC_LS_MODE, R1_0);
+    ledc_update_duty(LEDC_LS_MODE, R2_0);
+    ledc_update_duty(LEDC_LS_MODE, L1_1);
+    ledc_update_duty(LEDC_LS_MODE, L2_1);
+    ledc_update_duty(LEDC_LS_MODE, R1_1);
+    ledc_update_duty(LEDC_LS_MODE, R2_1);
+}
+
+
+
 void motor_forward1(){
-    bdc_motor_forward(motor1);
-    bdc_motor_forward(motor2);
-    bdc_motor_forward(motor3);
-    bdc_motor_forward(motor4);
-    bdc_motor_set_speed(motor1, 200);
-    bdc_motor_set_speed(motor2, 200);
-    bdc_motor_set_speed(motor3, 200);
-    bdc_motor_set_speed(motor4, 200);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
 }
 
 void motor_forward2(){
-    bdc_motor_forward(motor1);
-    bdc_motor_forward(motor2);
-    bdc_motor_forward(motor3);
-    bdc_motor_forward(motor4);
-    bdc_motor_set_speed(motor1, 400);
-    bdc_motor_set_speed(motor2, 400);
-    bdc_motor_set_speed(motor3, 400);
-    bdc_motor_set_speed(motor4, 400);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
+}
+
+void motor_forward3(){
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 41);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 41);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 41);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 41);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
 }
 
 void motor_stop(){
-    bdc_motor_set_speed(motor1, 0);
-    bdc_motor_set_speed(motor2, 0);
-    bdc_motor_set_speed(motor3, 0);
-    bdc_motor_set_speed(motor4, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
 }
 
 void motor_retreat1(){
-    bdc_motor_reverse(motor1);
-    bdc_motor_reverse(motor2);
-    bdc_motor_reverse(motor3);
-    bdc_motor_reverse(motor4);
-    bdc_motor_set_speed(motor1, 200);
-    bdc_motor_set_speed(motor2, 200);
-    bdc_motor_set_speed(motor3, 200);
-    bdc_motor_set_speed(motor4, 200);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 42);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 42);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 42);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 42);
+    motor_update();
 }
 
 void motor_retreat2(){
-    bdc_motor_reverse(motor1);
-    bdc_motor_reverse(motor2);
-    bdc_motor_reverse(motor3);
-    bdc_motor_reverse(motor4);
-    bdc_motor_set_speed(motor1, 400);
-    bdc_motor_set_speed(motor2, 400);
-    bdc_motor_set_speed(motor3, 400);
-    bdc_motor_set_speed(motor4, 400);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 62);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 62);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 62);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 62);
+    motor_update();
 }
 
 void motor_L_1(){
-    bdc_motor_forward(motor1);
-    bdc_motor_reverse(motor2);
-    bdc_motor_reverse(motor3);
-    bdc_motor_forward(motor4);
-    bdc_motor_set_speed(motor1, 200);
-    bdc_motor_set_speed(motor2, 200);
-    bdc_motor_set_speed(motor3, 200);
-    bdc_motor_set_speed(motor4, 200);
+    // bdc_motor_forward(motor1);
+    // bdc_motor_reverse(motor2);
+    // bdc_motor_reverse(motor3);
+    // bdc_motor_forward(motor4);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 42);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 42);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
 }
 
 void motor_L_2(){
-    bdc_motor_forward(motor1);
-    bdc_motor_reverse(motor2);
-    bdc_motor_reverse(motor3);
-    bdc_motor_forward(motor4);
-    bdc_motor_set_speed(motor1, 400);
-    bdc_motor_set_speed(motor2, 400);
-    bdc_motor_set_speed(motor3, 400);
-    bdc_motor_set_speed(motor4, 400);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 62);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 62);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
 }
 
 void motor_R_1(){
-    bdc_motor_reverse(motor1);
-    bdc_motor_forward(motor2);
-    bdc_motor_forward(motor3);
-    bdc_motor_reverse(motor4);
-    bdc_motor_set_speed(motor1, 200);
-    bdc_motor_set_speed(motor2, 200);
-    bdc_motor_set_speed(motor3, 200);
-    bdc_motor_set_speed(motor4, 200);
+    // bdc_motor_reverse(motor1);
+    // bdc_motor_forward(motor2);
+    // bdc_motor_forward(motor3);
+    // bdc_motor_reverse(motor4);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 42);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 42);
+    motor_update();
 }
 
 void motor_R_2(){
-    bdc_motor_reverse(motor1);
-    bdc_motor_forward(motor2);
-    bdc_motor_forward(motor3);
-    bdc_motor_reverse(motor4);
-    bdc_motor_set_speed(motor1, 400);
-    bdc_motor_set_speed(motor2, 400);
-    bdc_motor_set_speed(motor3, 400);
-    bdc_motor_set_speed(motor4, 400);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 62);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 62);
+    motor_update();
 }
 
 void motor_R_forward1(){
-    bdc_motor_forward(motor2);
-    bdc_motor_forward(motor3);
-    bdc_motor_set_speed(motor1, 0);
-    bdc_motor_set_speed(motor2, 200);
-    bdc_motor_set_speed(motor3, 200);
-    bdc_motor_set_speed(motor4, 0);
+    // bdc_motor_forward(motor2);
+    // bdc_motor_forward(motor3);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
 }
 
 void motor_R_forward2(){
-    bdc_motor_forward(motor2);
-    bdc_motor_forward(motor3);
-    bdc_motor_set_speed(motor1, 0);
-    bdc_motor_set_speed(motor2, 400);
-    bdc_motor_set_speed(motor3, 400);
-    bdc_motor_set_speed(motor4, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
 }
 
 void motor_L_forward1(){
-    bdc_motor_forward(motor1);
-    bdc_motor_forward(motor4);
-    bdc_motor_set_speed(motor1, 200);
-    bdc_motor_set_speed(motor2, 0);
-    bdc_motor_set_speed(motor3, 0);
-    bdc_motor_set_speed(motor4, 200);
+    // bdc_motor_forward(motor1);
+    // bdc_motor_forward(motor4);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
 }
 
 void motor_L_forward2(){
-    bdc_motor_forward(motor1);
-    bdc_motor_forward(motor4);
-    bdc_motor_set_speed(motor1, 400);
-    bdc_motor_set_speed(motor2, 0);
-    bdc_motor_set_speed(motor3, 0);
-    bdc_motor_set_speed(motor4, 400);
+    // bdc_motor_forward(motor1);
+    // bdc_motor_forward(motor4);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
 }
 
 void motor_R_retreat1(){
-    bdc_motor_reverse(motor1);
-    bdc_motor_reverse(motor4);
-    bdc_motor_set_speed(motor1, 200);
-    bdc_motor_set_speed(motor2, 0);
-    bdc_motor_set_speed(motor3, 0);
-    bdc_motor_set_speed(motor4, 200);
+    // bdc_motor_reverse(motor1);
+    // bdc_motor_reverse(motor4);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 42);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 42);
+    motor_update();
 }
 
 void motor_R_retreat2(){
-    bdc_motor_reverse(motor1);
-    bdc_motor_reverse(motor4);
-    bdc_motor_set_speed(motor1, 400);
-    bdc_motor_set_speed(motor2, 0);
-    bdc_motor_set_speed(motor3, 0);
-    bdc_motor_set_speed(motor4, 400);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 62);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 62);
+    motor_update();
 }
 
 void motor_L_retreat1(){
-    bdc_motor_reverse(motor2);
-    bdc_motor_reverse(motor3);
-    bdc_motor_set_speed(motor1, 0);
-    bdc_motor_set_speed(motor2, 200);
-    bdc_motor_set_speed(motor3, 200);
-    bdc_motor_set_speed(motor4, 0);
+    // bdc_motor_reverse(motor2);
+    // bdc_motor_reverse(motor3);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 42);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 42);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
 }
 
 void motor_L_retreat2(){
-    bdc_motor_reverse(motor2);
-    bdc_motor_reverse(motor3);
-    bdc_motor_set_speed(motor1, 0);
-    bdc_motor_set_speed(motor2, 400);
-    bdc_motor_set_speed(motor3, 400);
-    bdc_motor_set_speed(motor4, 0);
+    // bdc_motor_reverse(motor2);
+    // bdc_motor_reverse(motor3);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 62);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 62);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
 }
-
 void motor_R_return1(){
-    bdc_motor_forward(motor1);
-    bdc_motor_forward(motor3);
-    bdc_motor_reverse(motor2);
-    bdc_motor_reverse(motor4);
-    bdc_motor_set_speed(motor1, 200);
-    bdc_motor_set_speed(motor2, 200);
-    bdc_motor_set_speed(motor3, 200);
-    bdc_motor_set_speed(motor4, 200);
+    // bdc_motor_forward(motor1);
+    // bdc_motor_forward(motor3);
+    // bdc_motor_reverse(motor2);
+    // bdc_motor_reverse(motor4);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 42);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 42);
+    motor_update();
 }
 
 void motor_R_return2(){
-    bdc_motor_forward(motor1);
-    bdc_motor_forward(motor3);
-    bdc_motor_reverse(motor2);
-    bdc_motor_reverse(motor4);
-    bdc_motor_set_speed(motor1, 400);
-    bdc_motor_set_speed(motor2, 400);
-    bdc_motor_set_speed(motor3, 400);
-    bdc_motor_set_speed(motor4, 400);
+    // bdc_motor_forward(motor1);
+    // bdc_motor_forward(motor3);
+    // bdc_motor_reverse(motor2);
+    // bdc_motor_reverse(motor4);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 62);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 62);
+    motor_update();
+}
+
+void motor_RS_return(){
+        ledc_set_duty(LEDC_LS_MODE, L1_0, 28);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 28);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 28);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 28);
+    motor_update();
 }
 
 void motor_L_return1(){
-    bdc_motor_forward(motor2);
-    bdc_motor_forward(motor4);
-    bdc_motor_reverse(motor1);
-    bdc_motor_reverse(motor3);
-    bdc_motor_set_speed(motor1, 200);
-    bdc_motor_set_speed(motor2, 200);
-    bdc_motor_set_speed(motor3, 200);
-    bdc_motor_set_speed(motor4, 200);
+    // bdc_motor_forward(motor2);
+    // bdc_motor_forward(motor4);
+    // bdc_motor_reverse(motor1);
+    // bdc_motor_reverse(motor3);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 42);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 42);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 42);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
 }
 
 void motor_L_return2(){
-    bdc_motor_forward(motor2);
-    bdc_motor_forward(motor4);
-    bdc_motor_reverse(motor1);
-    bdc_motor_reverse(motor3);
-    bdc_motor_set_speed(motor1, 400);
-    bdc_motor_set_speed(motor2, 400);
-    bdc_motor_set_speed(motor3, 400);
-    bdc_motor_set_speed(motor4, 400);
+    // bdc_motor_forward(motor2);
+    // bdc_motor_forward(motor4);
+    // bdc_motor_reverse(motor1);
+    // bdc_motor_reverse(motor3);
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 62);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 62);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 62);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
 }
 
-void motor_test1(){
-    bdc_motor_forward(motor1);
-    bdc_motor_forward(motor2);
-    bdc_motor_forward(motor3);
-    bdc_motor_forward(motor4);
-
-    bdc_motor_set_speed(motor1, 200);
-    vTaskDelay(500/portTICK_PERIOD_MS);
-    bdc_motor_set_speed(motor1, 0);
-
-    bdc_motor_set_speed(motor2, 200);
-    vTaskDelay(500/portTICK_PERIOD_MS);
-    bdc_motor_set_speed(motor2, 0);
-
-    bdc_motor_set_speed(motor3, 200);
-    vTaskDelay(500/portTICK_PERIOD_MS);
-    bdc_motor_set_speed(motor3, 0);
-
-    bdc_motor_set_speed(motor4, 200);
-    vTaskDelay(500/portTICK_PERIOD_MS);
-    bdc_motor_set_speed(motor4, 0);
+void motor_LS_return()
+{
+    ledc_set_duty(LEDC_LS_MODE, L1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, L2_0, 28);
+    ledc_set_duty(LEDC_LS_MODE, R1_0, 0);
+    ledc_set_duty(LEDC_LS_MODE, R2_0, 28);
+    ledc_set_duty(LEDC_LS_MODE, L1_1, 28);
+    ledc_set_duty(LEDC_LS_MODE, L2_1, 0);
+    ledc_set_duty(LEDC_LS_MODE, R1_1, 28);
+    ledc_set_duty(LEDC_LS_MODE, R2_1, 0);
+    motor_update();
 }
+// void motor_test1(){
+//     // bdc_motor_forward(motor1);
+//     // bdc_motor_forward(motor2);
+//     // bdc_motor_forward(motor3);
+//     // bdc_motor_forward(motor4);
+
+//     // bdc_motor_set_speed(motor1, 200);
+//     // vTaskDelay(500/portTICK_PERIOD_MS);
+//     // bdc_motor_set_speed(motor1, 0);
+
+//     // bdc_motor_set_speed(motor2, 200);
+//     // vTaskDelay(500/portTICK_PERIOD_MS);
+//     // bdc_motor_set_speed(motor2, 0);
+
+//     // bdc_motor_set_speed(motor3, 200);
+//     // vTaskDelay(500/portTICK_PERIOD_MS);
+//     // bdc_motor_set_speed(motor3, 0);
+
+//     // bdc_motor_set_speed(motor4, 200);
+//     // vTaskDelay(500/portTICK_PERIOD_MS);
+//     // bdc_motor_set_speed(motor4, 0);
+// }
