@@ -10,6 +10,8 @@
 #include "esp_check.h"
 #include "bdc_motor.h"
 #include "bdc_motor_interface.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "bdc_motor";
 
@@ -77,13 +79,13 @@ void motor_init()
     };
     bdc_motor_config_t motor_config_2 = {
         .pwm_freq_hz = BDC_MCPWM_FREQ_HZ,
-        .pwma_gpio_num = BDC_MCPWM_GPIO_R1_A,
-        .pwmb_gpio_num =  BDC_MCPWM_GPIO_R1_B,
+        .pwma_gpio_num = BDC_MCPWM_GPIO_L2_A,
+        .pwmb_gpio_num =  BDC_MCPWM_GPIO_L2_B,
     };
     bdc_motor_config_t motor_config_3 = {
         .pwm_freq_hz = BDC_MCPWM_FREQ_HZ,
-        .pwma_gpio_num = BDC_MCPWM_GPIO_L2_A,
-        .pwmb_gpio_num =  BDC_MCPWM_GPIO_L2_B,
+        .pwma_gpio_num = BDC_MCPWM_GPIO_R1_A,
+        .pwmb_gpio_num =  BDC_MCPWM_GPIO_R1_B,
     };
     bdc_motor_config_t motor_config_4 = {
         .pwm_freq_hz = BDC_MCPWM_FREQ_HZ,
@@ -117,7 +119,7 @@ void motor_init()
     bdc_motor_enable(motor3);
     bdc_motor_enable(motor4);
 
-    
+
    
 }
 
@@ -126,10 +128,10 @@ void motor_forward1(){
     bdc_motor_forward(motor2);
     bdc_motor_forward(motor3);
     bdc_motor_forward(motor4);
-    bdc_motor_set_speed(motor1, 300);
-    bdc_motor_set_speed(motor2, 300);
-    bdc_motor_set_speed(motor3, 300);
-    bdc_motor_set_speed(motor4, 300);
+    bdc_motor_set_speed(motor1, 200);
+    bdc_motor_set_speed(motor2, 200);
+    bdc_motor_set_speed(motor3, 200);
+    bdc_motor_set_speed(motor4, 200);
 }
 
 void motor_forward2(){
@@ -155,10 +157,10 @@ void motor_retreat1(){
     bdc_motor_reverse(motor2);
     bdc_motor_reverse(motor3);
     bdc_motor_reverse(motor4);
-    bdc_motor_set_speed(motor1, 300);
-    bdc_motor_set_speed(motor2, 300);
-    bdc_motor_set_speed(motor3, 300);
-    bdc_motor_set_speed(motor4, 300);
+    bdc_motor_set_speed(motor1, 200);
+    bdc_motor_set_speed(motor2, 200);
+    bdc_motor_set_speed(motor3, 200);
+    bdc_motor_set_speed(motor4, 200);
 }
 
 void motor_retreat2(){
@@ -172,18 +174,18 @@ void motor_retreat2(){
     bdc_motor_set_speed(motor4, 400);
 }
 
-void motor_R_1(){
+void motor_L_1(){
     bdc_motor_forward(motor1);
     bdc_motor_reverse(motor2);
     bdc_motor_reverse(motor3);
     bdc_motor_forward(motor4);
-    bdc_motor_set_speed(motor1, 300);
-    bdc_motor_set_speed(motor2, 300);
-    bdc_motor_set_speed(motor3, 300);
-    bdc_motor_set_speed(motor4, 300);
+    bdc_motor_set_speed(motor1, 200);
+    bdc_motor_set_speed(motor2, 200);
+    bdc_motor_set_speed(motor3, 200);
+    bdc_motor_set_speed(motor4, 200);
 }
 
-void motor_R_2(){
+void motor_L_2(){
     bdc_motor_forward(motor1);
     bdc_motor_reverse(motor2);
     bdc_motor_reverse(motor3);
@@ -194,18 +196,18 @@ void motor_R_2(){
     bdc_motor_set_speed(motor4, 400);
 }
 
-void motor_L_1(){
+void motor_R_1(){
     bdc_motor_reverse(motor1);
     bdc_motor_forward(motor2);
     bdc_motor_forward(motor3);
     bdc_motor_reverse(motor4);
-    bdc_motor_set_speed(motor1, 300);
-    bdc_motor_set_speed(motor2, 300);
-    bdc_motor_set_speed(motor3, 300);
-    bdc_motor_set_speed(motor4, 300);
+    bdc_motor_set_speed(motor1, 200);
+    bdc_motor_set_speed(motor2, 200);
+    bdc_motor_set_speed(motor3, 200);
+    bdc_motor_set_speed(motor4, 200);
 }
 
-void motor_L_2(){
+void motor_R_2(){
     bdc_motor_reverse(motor1);
     bdc_motor_forward(motor2);
     bdc_motor_forward(motor3);
@@ -217,33 +219,15 @@ void motor_L_2(){
 }
 
 void motor_R_forward1(){
-    bdc_motor_forward(motor1);
-    bdc_motor_forward(motor4);
-    bdc_motor_set_speed(motor1, 300);
-    bdc_motor_set_speed(motor2, 0);
-    bdc_motor_set_speed(motor3, 0);
-    bdc_motor_set_speed(motor4, 300);
-}
-
-void motor_R_forward2(){
-    bdc_motor_forward(motor1);
-    bdc_motor_forward(motor4);
-    bdc_motor_set_speed(motor1, 400);
-    bdc_motor_set_speed(motor2, 0);
-    bdc_motor_set_speed(motor3, 0);
-    bdc_motor_set_speed(motor4, 400);
-}
-
-void motor_L_forward1(){
     bdc_motor_forward(motor2);
     bdc_motor_forward(motor3);
     bdc_motor_set_speed(motor1, 0);
-    bdc_motor_set_speed(motor2, 300);
-    bdc_motor_set_speed(motor3, 300);
+    bdc_motor_set_speed(motor2, 200);
+    bdc_motor_set_speed(motor3, 200);
     bdc_motor_set_speed(motor4, 0);
 }
 
-void motor_L_forward2(){
+void motor_R_forward2(){
     bdc_motor_forward(motor2);
     bdc_motor_forward(motor3);
     bdc_motor_set_speed(motor1, 0);
@@ -252,16 +236,34 @@ void motor_L_forward2(){
     bdc_motor_set_speed(motor4, 0);
 }
 
-void motor_L_retreat1(){
-    bdc_motor_reverse(motor1);
-    bdc_motor_reverse(motor4);
-    bdc_motor_set_speed(motor1, 300);
+void motor_L_forward1(){
+    bdc_motor_forward(motor1);
+    bdc_motor_forward(motor4);
+    bdc_motor_set_speed(motor1, 200);
     bdc_motor_set_speed(motor2, 0);
     bdc_motor_set_speed(motor3, 0);
-    bdc_motor_set_speed(motor4, 300);
+    bdc_motor_set_speed(motor4, 200);
 }
 
-void motor_L_retreat2(){
+void motor_L_forward2(){
+    bdc_motor_forward(motor1);
+    bdc_motor_forward(motor4);
+    bdc_motor_set_speed(motor1, 400);
+    bdc_motor_set_speed(motor2, 0);
+    bdc_motor_set_speed(motor3, 0);
+    bdc_motor_set_speed(motor4, 400);
+}
+
+void motor_R_retreat1(){
+    bdc_motor_reverse(motor1);
+    bdc_motor_reverse(motor4);
+    bdc_motor_set_speed(motor1, 200);
+    bdc_motor_set_speed(motor2, 0);
+    bdc_motor_set_speed(motor3, 0);
+    bdc_motor_set_speed(motor4, 200);
+}
+
+void motor_R_retreat2(){
     bdc_motor_reverse(motor1);
     bdc_motor_reverse(motor4);
     bdc_motor_set_speed(motor1, 400);
@@ -270,16 +272,16 @@ void motor_L_retreat2(){
     bdc_motor_set_speed(motor4, 400);
 }
 
-void motor_R_retreat1(){
+void motor_L_retreat1(){
     bdc_motor_reverse(motor2);
     bdc_motor_reverse(motor3);
     bdc_motor_set_speed(motor1, 0);
-    bdc_motor_set_speed(motor2, 300);
-    bdc_motor_set_speed(motor3, 300);
+    bdc_motor_set_speed(motor2, 200);
+    bdc_motor_set_speed(motor3, 200);
     bdc_motor_set_speed(motor4, 0);
 }
 
-void motor_R_retreat2(){
+void motor_L_retreat2(){
     bdc_motor_reverse(motor2);
     bdc_motor_reverse(motor3);
     bdc_motor_set_speed(motor1, 0);
@@ -293,10 +295,10 @@ void motor_R_return1(){
     bdc_motor_forward(motor3);
     bdc_motor_reverse(motor2);
     bdc_motor_reverse(motor4);
-    bdc_motor_set_speed(motor1, 300);
-    bdc_motor_set_speed(motor2, 300);
-    bdc_motor_set_speed(motor3, 300);
-    bdc_motor_set_speed(motor4, 300);
+    bdc_motor_set_speed(motor1, 200);
+    bdc_motor_set_speed(motor2, 200);
+    bdc_motor_set_speed(motor3, 200);
+    bdc_motor_set_speed(motor4, 200);
 }
 
 void motor_R_return2(){
@@ -315,10 +317,10 @@ void motor_L_return1(){
     bdc_motor_forward(motor4);
     bdc_motor_reverse(motor1);
     bdc_motor_reverse(motor3);
-    bdc_motor_set_speed(motor1, 300);
-    bdc_motor_set_speed(motor2, 300);
-    bdc_motor_set_speed(motor3, 300);
-    bdc_motor_set_speed(motor4, 300);
+    bdc_motor_set_speed(motor1, 200);
+    bdc_motor_set_speed(motor2, 200);
+    bdc_motor_set_speed(motor3, 200);
+    bdc_motor_set_speed(motor4, 200);
 }
 
 void motor_L_return2(){
@@ -330,4 +332,27 @@ void motor_L_return2(){
     bdc_motor_set_speed(motor2, 400);
     bdc_motor_set_speed(motor3, 400);
     bdc_motor_set_speed(motor4, 400);
+}
+
+void motor_test1(){
+    bdc_motor_forward(motor1);
+    bdc_motor_forward(motor2);
+    bdc_motor_forward(motor3);
+    bdc_motor_forward(motor4);
+
+    bdc_motor_set_speed(motor1, 200);
+    vTaskDelay(500/portTICK_PERIOD_MS);
+    bdc_motor_set_speed(motor1, 0);
+
+    bdc_motor_set_speed(motor2, 200);
+    vTaskDelay(500/portTICK_PERIOD_MS);
+    bdc_motor_set_speed(motor2, 0);
+
+    bdc_motor_set_speed(motor3, 200);
+    vTaskDelay(500/portTICK_PERIOD_MS);
+    bdc_motor_set_speed(motor3, 0);
+
+    bdc_motor_set_speed(motor4, 200);
+    vTaskDelay(500/portTICK_PERIOD_MS);
+    bdc_motor_set_speed(motor4, 0);
 }
